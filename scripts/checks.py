@@ -35,3 +35,10 @@ print('PASS: emergency-only dialer, persistent launcher aliases, calculator exit
 
 assert s.count('setNeutralButton("Calculator"')==4
 print("PASS: calculator escape available in all external/emergency confirmation and missing-handler dialogs (static only)")
+
+# UI structure only; not a TalkBack or Android rendering test.
+assert 'info.setClassName(Button.class.getName())' in s
+assert 'IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS' in s
+assert 'android.R.attr.state_pressed' in s and 'android.R.attr.state_focused' in s
+assert 'interactive(b,box(colors[r])' in s and 'interactive(panic,' in s
+print('PASS: resource-card button semantics and control pressed/focus states (static only)')

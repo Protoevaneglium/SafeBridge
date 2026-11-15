@@ -36,7 +36,7 @@ ANDROID_HOME=/path/to/sdk bash scripts/build.sh
 python3 scripts/checks.py
 ```
 
-Produces `build/SafeBridge-unsigned.apk`. Sign with your own test/release key using Android `apksigner`. No signing keys are distributed or committed. Application ID `com.stange.safebridge.preview`, min API 26, target API 35, version 0.2.0-preview.
+Produces `build/SafeBridge-unsigned.apk`. Sign with your own test/release key using Android `apksigner`. No signing keys are distributed or committed. Application ID `com.stange.safebridge.preview`, min API 26, target API 35, version 0.3.0-preview.
 
 ## Validation and limitations
 Native compilation, static safety checks and APK signature verification completed for delivered preview. No emulator or S24 runtime verification completed. No real calls/reports sent. Do not treat compilation as a functional or safety certification.
@@ -60,3 +60,12 @@ This revision also adds destination-specific disclosure before hotline/CyberTipl
 - Signing key is private and excluded. The 0.2 test APK was delivered privately to the owner. This repository publishes its source, not a public APK release or an emergency-service product.
 
 External website/dialer confirmations, emergency confirmation and missing-handler dialogs include a Calculator button so switching does not require canceling first. The calculator return dialog can be canceled without leaving calculator mode. Native confirmation layout/accessibility remains device-untested.
+
+## 0.3 visual refresh (private test build)
+Original light cyan/blue gradient, softly translucent rounded panels, prominent resource cards and pill controls inspired by broad glass-UI principles. No Apple logos, reference artwork, screenshots, fonts or third-party icons are embedded. Native static gradients, not live blur, animation or background rendering loops.
+
+Emergency confirmation and dialer handoff, external navigation disclosures, calculator arithmetic, persistent launcher aliases and all privacy caveats are retained from 0.2. The camouflage is not authentication or guaranteed concealment. Long-press = to confirm return; Back closes calculator without opening help. Calculations remain memory-only.
+
+This is a UI revision, not a public safety certification. The reference image is not distributed with source or APK. This repository publishes the reviewed 0.3 source; the test APK is privately delivered, not a public APK release.
+
+See VERIFICATION.md for checks and remaining device tests.
