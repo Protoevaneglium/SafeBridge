@@ -20,6 +20,7 @@ public class MainActivity extends Activity {
     private static final String HOTLINE_POLICY="Your name and identifying details are optional. The hotline generally requires explicit consent to disclose identifying information, but reports suspected abuse of a minor, potential harm to you or others, and situations legally requiring a report. Read its policy before sharing.";
     private static final String CYBERTIP_POLICY="If you submit a CyberTipline report, NCMEC analysts process it and make it available to the appropriate law enforcement agency. Opening this page does not submit a report. You decide whether to complete and submit the official form.";
     private LinearLayout page; private String section="home";
+    private PageDeck deck;
     private final Calculator calculator=new Calculator();
     private TextView calculation;
     private boolean isCloaked(){return getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.stange.safebridge.CalculatorLauncher"))==PackageManager.COMPONENT_ENABLED_STATE_ENABLED;}
@@ -35,7 +36,7 @@ public class MainActivity extends Activity {
     private void add(String s){page.addView(text(s,16,false));}
     private void title(String s){page.addView(text(s,28,true));}
     private GradientDrawable box(int c){GradientDrawable g=new GradientDrawable();g.setColor(c);g.setCornerRadius(dp(24));g.setStroke(dp(1),Color.argb(210,255,255,255));return g;}
-    private GradientDrawable glass(){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xEEFFFFFF,0xDCEFF9FC});g.setCornerRadius(dp(26));g.setStroke(dp(1),0xFFFFFFFF);return g;}
+    private GradientDrawable glass(){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xCBFFFFFF,0xAFEFF9FC});g.setCornerRadius(dp(26));g.setStroke(dp(1),0xFFFFFFFF);return g;}
     private void surface(View v){v.setBackground(glass());v.setElevation(dp(2));}
     private void interactive(View view,Drawable normal,int color,boolean dark){
         StateListDrawable states=new StateListDrawable();
@@ -50,7 +51,7 @@ public class MainActivity extends Activity {
     private void button(String s,Runnable action,boolean primary){Button b=control(s,action);b.setTextSize(16);b.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);b.setPadding(dp(20),dp(18),dp(20),dp(18));b.setMinHeight(dp(60));if(primary){b.setTextColor(Color.WHITE);interactive(b,box(teal),teal,true);}LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(6),0,dp(6));page.addView(b,p);}
     private void route(String label,String dest){button(label,()->show(dest),false);}
     private void resource(String symbol,String heading,String detail,String dest,int accent){
-        LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(18),dp(18),dp(18));surface(card);interactive(card,glass(),0xFFF1F8FF,false);
+        LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(14),dp(18),dp(14));surface(card);interactive(card,glass(),0xFFF1F8FF,false);
         TextView icon=text(symbol,23,true);icon.setGravity(Gravity.CENTER);icon.setPadding(0,0,0,0);icon.setBackground(box(accent));icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(icon,new LinearLayout.LayoutParams(dp(52),dp(52)));
         LinearLayout labels=new LinearLayout(this);labels.setOrientation(LinearLayout.VERTICAL);labels.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);labels.setPadding(dp(14),0,dp(8),0);TextView h=text(heading,18,true);h.setPadding(0,0,0,dp(4));labels.addView(h);TextView d=text(detail,14,false);d.setPadding(0,0,0,0);labels.addView(d);card.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         TextView arrow=text("›",26,false);arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(arrow);card.setClickable(true);card.setFocusable(true);card.setContentDescription(heading+". "+detail);card.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);card.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());info.setClickable(true);}});card.setOnClickListener(v->show(dest));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(6));page.addView(card,lp);
@@ -74,51 +75,61 @@ public class MainActivity extends Activity {
         String disclosure="";
         if(url.equals("tel:18883737888") || url.startsWith("https://humantraffickinghotline.org/")) disclosure=HOTLINE_POLICY+"\n\n";
         if(url.startsWith("https://report.cybertip.org/") || url.startsWith("https://www.missingkids.org/gethelpnow/cybertipline")) disclosure=CYBERTIP_POLICY+"\n\n";
-        new AlertDialog.Builder(this).setTitle(dial?"Open phone dialer?":"Leave Safe Bridge?")
+        new PagedDialog.Builder(this).setTitle(dial?"Open phone dialer?":"Leave Safe Bridge?")
         .setMessage(disclosure+(dial?"The dialer opens with this number. You choose whether to place the call. Calls may appear in phone or carrier records.\n\n":"This opens your browser. The website has its own privacy practices. Browser history, device monitoring or network records may reveal activity. No report is sent by this app.\n\n")+url)
         .setNeutralButton("Calculator",(d,w)->cloak(true)).setNegativeButton("Cancel",null).setPositiveButton(dial?"Open dialer":"Open website",(d,w)->{
             try{startActivity(new Intent(dial?Intent.ACTION_DIAL:Intent.ACTION_VIEW,Uri.parse(url)));}
-            catch(ActivityNotFoundException e){new AlertDialog.Builder(this).setTitle("No compatible app found").setMessage("Use another safe device or compatible browser/phone app. Address or number:\n"+url).setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
+            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("No compatible app found").setMessage("Use another safe device or compatible browser/phone app. Address or number:\n"+url).setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
         }).show();
     }
     private void emergency(){
-        new AlertDialog.Builder(this).setTitle("Emergency • U.S. 911")
+        new PagedDialog.Builder(this).setTitle("Emergency • U.S. 911")
         .setMessage("Open 911 in your phone dialer? You must then tap Call in the phone app. Safe Bridge does not call automatically, dispatch help or send your location. Calls can leave records. Do not test with a real emergency call.")
         .setNeutralButton("Calculator",(d,w)->cloak(true)).setNegativeButton("Cancel",null).setPositiveButton("Open 911 dialer",(d,w)->{
             try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:911")));}
-            catch(ActivityNotFoundException e){new AlertDialog.Builder(this).setTitle("Phone dialer unavailable").setMessage("This device cannot open a phone dialer. Use a phone to call 911 in the U.S. if safe.").setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
+            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("Phone dialer unavailable").setMessage("This device cannot open a phone dialer. Use a phone to call 911 in the U.S. if safe.").setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
         }).show();
     }
     private void calculatorPage(){
-        title("Calculator");
-        calculation=text(calculator.display(),36,true);calculation.setGravity(Gravity.END);calculation.setPadding(dp(12),dp(24),dp(12),dp(24));calculation.setBackground(box(Color.WHITE));page.addView(calculation);
-        String[][] rows={{"AC","±","%","÷"},{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{"⌫","0",".","="}};
+        
+        calculation=text(calculator.display(),28,true);calculation.setGravity(Gravity.END);calculation.setPadding(dp(12),dp(8),dp(12),dp(8));calculation.setBackground(box(Color.WHITE));page.addView(calculation);
+        String[][] rows=getResources().getConfiguration().screenWidthDp>getResources().getConfiguration().screenHeightDp?new String[][]{{"AC","±","%","⌫","÷"},{"7","8","9",".","×"},{"4","5","6","0","−"},{"1","2","3","=","+"}}:new String[][]{{"AC","±","%","÷"},{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{"⌫","0",".","="}};
         int[] colors={Color.rgb(255,215,228),Color.rgb(211,225,255),Color.rgb(211,245,226),Color.rgb(255,230,186),Color.rgb(225,210,255)};
         for(int r=0;r<rows.length;r++){
             LinearLayout row=new LinearLayout(this);
-            for(String key:rows[r]){Button b=new Button(this);b.setText(key);b.setTextSize(23);b.setTextColor(ink);b.setAllCaps(false);b.setMinHeight(dp(64));interactive(b,box(colors[r]),colors[r],false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),dp(5),dp(3),dp(5));row.addView(b,lp);
+            for(String key:rows[r]){Button b=new Button(this);b.setText(key);b.setTextSize(23);b.setTextColor(ink);b.setAllCaps(false);b.setMinHeight(dp(48));interactive(b,box(colors[r]),colors[r],false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),dp(5),dp(3),dp(5));row.addView(b,lp);
                 b.setOnClickListener(v->{calculator.key(key);calculation.setText(calculator.display());});
-                if(key.equals("=")){b.setOnLongClickListener(v->{new AlertDialog.Builder(this).setTitle("Change view?").setMessage("Return to Safe Bridge? Its name and icon will become visible again.").setNegativeButton("Cancel",null).setPositiveButton("Return",(d,w)->cloak(false)).show();return true;});}
-            }page.addView(row);
+                if(key.equals("=")){b.setOnLongClickListener(v->{new PagedDialog.Builder(this).setTitle("Change view?").setMessage("Return to Safe Bridge? Its name and icon will become visible again.").setNegativeButton("Cancel",null).setPositiveButton("Return",(d,w)->cloak(false)).show();return true;});}
+            }page.addView(row,new LinearLayout.LayoutParams(-1,0,1));
         }
     }
     private void show(String name){section=name;
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setClipToPadding(false);page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(dp(20),dp(12),dp(20),dp(28));scroll.addView(page);
+        page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);
+        deck=new PageDeck(this);
         LinearLayout frame=new LinearLayout(this);frame.setOrientation(LinearLayout.VERTICAL);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFFE6F5F6,0xFFD9F1F4,0xFFE9EFFA}));setContentView(frame);
         frame.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
-        LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);TextView brand=text(name.equals("calculator")?"Calculator":"Safe Bridge",21,true);top.addView(brand,new LinearLayout.LayoutParams(0,-2,1));top.addView(control("Close",()->finishAndRemoveTask()));top.setPadding(dp(22),dp(12),dp(20),dp(12));frame.addView(top);
+        LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);TextView brand=text(name.equals("calculator")?"Calculator":"Safe Bridge",21,true);top.addView(brand,new LinearLayout.LayoutParams(0,-2,1));top.addView(control("Close",()->finishAndRemoveTask()));top.setPadding(dp(22),dp(12),dp(20),dp(12));frame.addView(top);if(getResources().getConfiguration().screenHeightDp<500)top.setVisibility(View.GONE);
         if(!name.equals("calculator")){LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(20),0,dp(20),dp(8));Button panic=control("Emergency • 911",()->emergency());panic.setTextColor(Color.WHITE);interactive(panic,box(Color.rgb(163,32,56)),Color.rgb(163,32,56),true);panic.setMinHeight(dp(52));controls.addView(panic,new LinearLayout.LayoutParams(0,-2,1));Button mask=control("◈",()->cloak(true));mask.setTextSize(24);mask.setContentDescription("Switch to calculator");mask.setMinHeight(dp(52));LinearLayout.LayoutParams ml=new LinearLayout.LayoutParams(dp(64),-2);ml.setMargins(dp(10),0,0,0);controls.addView(mask,ml);frame.addView(controls);}
-        frame.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        if(name.equals("calculator")){calculatorPage();return;}
-        if(!name.equals("home"))button("‹  Back to start",()->show("home"),false);
+        frame.addView(deck,new LinearLayout.LayoutParams(-1,0,1));
+        if(!name.equals("calculator")){
+            LinearLayout dock=new LinearLayout(this);dock.setPadding(dp(16),dp(6),dp(16),dp(8));
+            String[] labels={"Home","Privacy","About"}, targets={"home","safety","about"};
+            for(int k=0;k<labels.length;k++){final String target=targets[k];Button nav=control(labels[k],()->show(target));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),0,dp(3),0);dock.addView(nav,lp);}frame.addView(dock);if(getResources().getConfiguration().screenHeightDp<500)dock.setVisibility(View.GONE);
+        }
+        if(name.equals("calculator")){calculatorPage();int index=frame.indexOfChild(deck);frame.removeView(deck);page.setPadding(dp(16),0,dp(16),dp(8));frame.addView(page,index,new LinearLayout.LayoutParams(-1,0,1));return;}
+        
+        if(!name.equals("home") && getResources().getConfiguration().screenHeightDp<500)route("‹ Home","home");
         switch(name){
         case "home":
-            welcome();
-            note("U.S. RESOURCE PROTOTYPE • Not an emergency or monitored service. No one receives messages here. In immediate danger in the U.S., call 911 if safe to do so.");
-            TextView explore=text("Explore your options",21,true);explore.setPadding(0,dp(10),0,dp(10));page.addView(explore);
+            TextView greeting=text("A little support.\nA next step.",30,true);greeting.setPadding(dp(6),dp(4),0,dp(12));page.addView(greeting);
+            TextView intro=text("U.S. resource guide • Not a monitored service",13,false);page.addView(intro);
             resource("♡","Find support","Connect with a trained advocate","help",0xFF9EE1EF);resource("◇","Concerned about a child","Understand official reporting options","child",0xFFA3EED9);resource("▧","Intimate-image support","Find tools and eligibility guidance","images",0xFFF5CBE6);resource("⊙","Device safety","Understand privacy and digital traces","safety",0xFFDCD8F5);
+            route("Before you begin · Privacy & disguise","intro");route("About & sources","about");break;
+        case "intro":
+            title("Before you begin");
+            note("U.S. RESOURCE PROTOTYPE • Not an emergency or monitored service. No one receives messages here. In immediate danger in the U.S., call 911 if safe to do so.");
             note("The ◈ button instantly opens a colorful calculator and changes the launcher name/icon. Long-press = in the calculator to return. Android accessibility services can also perform a long-click. This is a visual disguise, not protection from discovery: Settings, app info, account/download records, monitoring and launcher caches can reveal Safe Bridge. Try the controls only when safe.");
-            note("Installed apps, browser history and call records can be discovered. Close does not erase traces or hide this app. Consider another device if yours may be monitored.");route("About this preview & sources","about");break;
+            note("Installed apps, browser history and call records can be discovered. Close does not erase traces or hide this app. Consider another device if yours may be monitored.");break;
         case "help":
             title("You deserve support.");add("If someone is forcing or threatening you into work or sexual activity, a trained advocate can help you consider options. You do not have to decide everything now.");
             note("Choose a way to reach help only if it feels safe. Do not assume leaving or confronting someone is the safest immediate step. An advocate can help with an individualized plan.");
@@ -132,12 +143,13 @@ public class MainActivity extends Activity {
             note("Taken before you were 18? NCMEC’s Take It Down may help limit sharing on participating public or unencrypted services. You can use it even if you are an adult now. It does not cover all websites or encrypted messaging, and removal is not guaranteed.");
             add("Do not download, ask someone to send, or share an image to submit it. NCMEC’s FAQ says to use the device where the image was originally taken. If you no longer have access to that device, seek help through the CyberTipline instead. Safe Bridge never accepts images.");link("Open Take It Down","https://takeitdown.ncmec.org/");link("Read Take It Down eligibility & FAQ","https://takeitdown.ncmec.org/faq/");link("Report child exploitation to NCMEC","https://report.cybertip.org/");add("For images taken when you were 18 or older, Take It Down points to StopNCII. Read that service’s eligibility and privacy information before continuing.");link("Open StopNCII information","https://stopncii.org/");break;
         case "safety":
-            title("Your device may leave traces.");add("Someone with access to this phone, accounts or network may see installed apps, activity, calls or browsing. Safe Bridge cannot detect monitoring or make a compromised device safe.");
+            route("Calculator disguise & getting started","intro");title("Your device may leave traces.");add("Someone with access to this phone, accounts or network may see installed apps, activity, calls or browsing. Safe Bridge cannot detect monitoring or make a compromised device safe.");
             note("If using this phone could put you at risk, consider a device and account the other person cannot access, and support from a trusted advocate. Changing settings or deleting history can be noticed. Choose what is safest in your situation.");
             add("Safe Bridge itself has no accounts, analytics, location tracking, image uploads, notifications or saved notes. This does not describe the privacy practices of external websites, phone apps or the operating system. Guidance works offline. External websites and phone calls need their usual connectivity and may keep their own records.");add("Close removes this app’s task from recent apps, but does not uninstall it, clear browser/call history or erase device records. Uninstalling may still leave download history, backups or synced account records. Calculator mode changes the visible screen and launcher shortcut, but cannot make the app invisible. Settings/app info, installed-package records and launcher caches may still reveal Safe Bridge. Calculator mode stays selected after reopening; calculations are not saved.");link("Read NNEDV guidance on safer app use","https://www.techsafety.org/choosingapps");link("Read hotline digital safety warning","https://humantraffickinghotline.org/en/chat");break;
         default:
-            title("An early, independent preview.");add("Safe Bridge 0.4 • U.S.-focused\nA lightweight guide to existing services. Not affiliated with or endorsed by NCMEC or the National Human Trafficking Hotline.");note("Not for public deployment yet. Survivor, child-safety, accessibility, privacy and legal review are still needed. No live support, rescue service, AI advice, report submission or case tracking is provided.");add("Resource links checked November 14, 2026. Services and policies can change. Outside the U.S., seek appropriate local emergency and support services; this preview does not provide a verified international directory.");link("National Human Trafficking Hotline","https://humantraffickinghotline.org/en/get-help");link("NCMEC CyberTipline","https://www.missingkids.org/gethelpnow/cybertipline");link("NCMEC Take It Down","https://takeitdown.ncmec.org/");break;
+            title("An early, independent preview.");add("Safe Bridge 0.5 • U.S.-focused\nA lightweight guide to existing services. Not affiliated with or endorsed by NCMEC or the National Human Trafficking Hotline.");note("Not for public deployment yet. Survivor, child-safety, accessibility, privacy and legal review are still needed. No live support, rescue service, AI advice, report submission or case tracking is provided.");add("Resource links checked November 14, 2026. Services and policies can change. Outside the U.S., seek appropriate local emergency and support services; this preview does not provide a verified international directory.");link("National Human Trafficking Hotline","https://humantraffickinghotline.org/en/get-help");link("NCMEC CyberTipline","https://www.missingkids.org/gethelpnow/cybertipline");link("NCMEC Take It Down","https://takeitdown.ncmec.org/");break;
         }
+        deck.setSource(page);
     }
     @Override public void onBackPressed(){if(section.equals("calculator")){finishAndRemoveTask();return;}if(!section.equals("home"))show("home");else super.onBackPressed();}
 }

@@ -42,3 +42,14 @@ assert 'IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS' in s
 assert 'android.R.attr.state_pressed' in s and 'android.R.attr.state_focused' in s
 assert 'interactive(b,box(colors[r])' in s and 'interactive(panic,' in s
 print('PASS: resource-card button semantics and control pressed/focus states (static only)')
+
+# Page and sheet contracts are source checks, not an Android layout test.
+deck=(root/'app/src/main/java/com/stange/safebridge/PageDeck.java').read_text()
+sheet=(root/'app/src/main/java/com/stange/safebridge/PagedDialog.java').read_text()
+assert 'ScrollView' not in s+deck+sheet
+assert 'proceed.setEnabled(false)' in sheet and 'proceed.setEnabled(last)' in sheet
+assert 'remaining=remaining.substring(best)' in deck
+assert "remaining.lastIndexOf(' ',best-1)" in deck
+assert 'calculatorPage();int index=frame.indexOfChild(deck)' in s
+print('PASS: no scrolling widgets, final disclosure-page gate, text continuation, dedicated calculator (static only)')
+assert 'position.setText("Expand window")' in deck

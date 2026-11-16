@@ -7,7 +7,7 @@ JAR="$ANDROID_HOME/platforms/android-35/android.jar"
 BUILD=build
 mkdir -p "$BUILD/generated" "$BUILD/classes" "$BUILD/dex"
 "$TOOLS/aapt2" compile --dir app/src/main/res -o "$BUILD/resources.zip"
-"$TOOLS/aapt2" link -o "$BUILD/base.apk" -I "$JAR" --manifest app/src/main/AndroidManifest.xml --java "$BUILD/generated" --min-sdk-version 26 --target-sdk-version 35 --version-code 4 --version-name 0.4.0-preview "$BUILD/resources.zip"
+"$TOOLS/aapt2" link -o "$BUILD/base.apk" -I "$JAR" --manifest app/src/main/AndroidManifest.xml --java "$BUILD/generated" --min-sdk-version 26 --target-sdk-version 35 --version-code 5 --version-name 0.5.0-ui-test "$BUILD/resources.zip"
 java -m jdk.compiler/com.sun.tools.javac.Main -source 17 -target 17 -classpath "$JAR" -d "$BUILD/classes" $(find app/src/main/java "$BUILD/generated" -name '*.java')
 java -m jdk.jartool/sun.tools.jar.Main --create --file "$BUILD/classes.jar" -C "$BUILD/classes" .
 "$TOOLS/d8" --lib "$JAR" --min-api 26 --output "$BUILD/dex" "$BUILD/classes.jar"

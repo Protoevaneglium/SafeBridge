@@ -1,4 +1,8 @@
-# Safe Bridge 0.4.0-preview verification
+# Safe Bridge verification history
+
+Current source: 0.5.0-ui-test. Earlier 0.4 results below are historical; the 0.5 section identifies current checks. Publication is source-only on the existing UI-test branch; no public APK release or device-runtime certification.
+
+## Historical 0.4 verification
 ## Provenance and scope
 Derived from local 0.3 source in safe-bridge-glass. UI-only reference blend: mint hero, pastel resource accents and rounded translucent cards. Original artwork, not a copy of the reference illustrations. No feature, service, permissions or external action scope added.
 
@@ -26,5 +30,16 @@ APK v2/v3 signature verified. Package metadata checked: versionCode 4, min26/tar
 Certificate SHA-256: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
 APK SHA-256: 3d912fbebecea0133543fce1827b09144021b2d41eecc6defa08700e6ea50232
 
-## Source publication check
-The 0.4 UI test source is published on branch `ui-test-0.4`, separate from the main 0.3 application baseline. Static checks were rerun successfully during publication. The recorded build and 21 calculator test results above are prior build-stage results; a publication-time calculator rerun was unavailable because `javac` was not on PATH. No new Android runtime or device tests are claimed. No APK or signing key is included.
+## 0.5 UI test (November 16, 2026)
+- Reworked navigation as measured pages with Back/Next rather than scrolling.
+- Guidance paragraphs split at word boundaries without dropping text; oversized actionable resource cards become paged actionable text.
+- Added original pastel/glass arrangement inspired by supplied references; no reference artwork, branding, photographs or illustrations included.
+- Custom paged confirmation sheets retain Cancel/Calculator and require reaching the last disclosure page before the forward action is enabled. No calls or reports were performed in testing.
+- Calculator uses a dedicated keypad (four columns portrait, five landscape), not the guidance page deck; calculations and launcher alias behavior unchanged.
+- Compact short-window shell; Home/Privacy/About are also reachable as page actions. No scrolling widgets in app-owned UI.
+- Build completed; Android signature verified and certificate matches 0.4 UI Test. Same package com.stange.safebridge.pasteltest, versionCode 5. Original 0.3 installation is separate.
+- Static privacy/safety/intent/resource checks PASS; 21 calculator unit cases PASS.
+- Independent source review found overflow risks in first implementation. Changes made: paged custom dialogs, split oversized button labels, actionable-card fallback, dedicated calculator and compact short-window shell.
+- NOT VERIFIED: Android runtime, screenshots/rendering, TalkBack, extreme font sizes, split-screen/landscape geometry, S24 installation. Very small windows or extreme text size may still exceed minimum touch-target space; do not claim universal no-clipping or accessibility certification.
+- Native browser/dialer UI is outside this app's no-scroll design.
+- Final review hardening: sheets bounded to visible viewport; exact word-split bound corrected; if a styled text line cannot fit, show an Expand window state rather than rendering one-character disclosure pages. Forward disclosure action remains disabled. Full original source is retained for resizing. Native Cancel/Calculator alternatives remain outside the content deck. Extremely constrained overall control geometry remains a device-test limitation.
