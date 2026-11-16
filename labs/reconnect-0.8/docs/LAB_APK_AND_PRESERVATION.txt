@@ -1,0 +1,46 @@
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Safe Bridge UI Preview
+Signer #1 certificate SHA-256 digest: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
+Signer #1 certificate SHA-1 digest: 72eb0604b105c80b88e7de790c82ddfa96d14eb5
+Signer #1 certificate MD5 digest: 3b7fe52026f9f5aa048504ae1c47cf3a
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: b20376eb416ae46731bafa59a060ccbd975c689a9b68aa75deadce3cf6a50f15
+Signer #1 public key SHA-1 digest: c7aec0fa67d1d7c964d201439b4cc31092b2d0b9
+Signer #1 public key MD5 digest: 847316eecdc5ed86a9278fa21d691469
+package: name='com.stange.safebridge.reconnectlab' versionCode='8' versionName='0.8.0-reconnect-lab' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'26'
+targetSdkVersion:'35'
+uses-permission: name='android.permission.ACCESS_COARSE_LOCATION'
+uses-permission: name='android.permission.ACCESS_FINE_LOCATION'
+uses-permission: name='android.permission.FOREGROUND_SERVICE'
+uses-permission: name='android.permission.FOREGROUND_SERVICE_LOCATION'
+uses-permission: name='android.permission.POST_NOTIFICATIONS'
+uses-permission: name='android.permission.INTERNET'
+application-label:'Safe Bridge Reconnect Lab'
+application-icon-160:'res/drawable/ic_bridge.xml'
+application: label='Safe Bridge Reconnect Lab' icon='res/drawable/ic_bridge.xml'
+feature-group: label=''
+  uses-feature-not-required: name='android.hardware.location'
+  uses-feature-not-required: name='android.hardware.location.gps'
+  uses-feature-not-required: name='android.hardware.location.network'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+other-activities
+other-services
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--'
+densities: '160'
+7309cdd6278dc47a36fcf1d8fe4dc0a65a25a37e37810b5abe3d2debf75fc2aa  build/SafeBridge-0.8.0-reconnect-lab.apk
+52e9db584de408428846fb26026d80e657b9c9eb164965038230af2988862b18  /workspace/scratch/150d4492c6eb/safe-bridge-deliverables-0.6/SafeBridge-0.6.0-private-test.apk
+6eb3e38a39fc0d371c33512e7fe4cc3bbd493aeebcab3c042937cfdc284b4ea8  /workspace/scratch/150d4492c6eb/safe-bridge-deliverables-0.6/SafeBridge-0.6-source.zip
+1f7ed2fb2a5e06bd6498f80df5594a8bedc1714ec2cfcb620f568534c9a8df7f  /workspace/scratch/150d4492c6eb/safe-bridge-live-lab-deliverables/SafeBridge-0.7.0-live-lab.apk
+c860e0674cab20715b5a3e9b1bbaade3441c521fc192055004ac18d61d3f8331  /workspace/scratch/150d4492c6eb/safe-bridge-live-lab-deliverables/SafeBridge-0.7-live-lab-source.zip

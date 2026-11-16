@@ -1,0 +1,62 @@
+warning: [options] system modules path not set in conjunction with -source 17
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+1 warning
+PASS static: optional location permissions; no app INTERNET/background-location permission; dialer-only confirmed handoffs; missing-handler branches; calculator aliases/exit
+PASS static: critical safety/reporting/peer disclosures; reviewed domain allowlist; current forum eligibility link
+PASS static: reachable route graph; compact home choices; Back/Bundle contracts; single dialog; final-page gate; whole action labels; minimum touch targets
+These are source assertions, not Android runtime, layout, accessibility or emergency-service tests.
+PASS static: optional one-shot/local-only location; no auto-sending; expiry/stop contracts; no coordinates in saved activity state; live-backend limitation
+PASS static: location hardware optional; offline guidance remains available without location capability
+PASS 21 calculator arithmetic/repeated/interruption/reset cases
+PASS 22 navigation history/recreation/repeated-tap/bounds cases
+PASS: 21 location metadata, freshness, and share-text cases (host Java only)
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): true
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+Signer #1 certificate DN: CN=Safe Bridge UI Preview
+Signer #1 certificate SHA-256 digest: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
+Signer #1 certificate SHA-1 digest: 72eb0604b105c80b88e7de790c82ddfa96d14eb5
+Signer #1 certificate MD5 digest: 3b7fe52026f9f5aa048504ae1c47cf3a
+Signer #1 key algorithm: RSA
+Signer #1 key size (bits): 3072
+Signer #1 public key SHA-256 digest: b20376eb416ae46731bafa59a060ccbd975c689a9b68aa75deadce3cf6a50f15
+Signer #1 public key SHA-1 digest: c7aec0fa67d1d7c964d201439b4cc31092b2d0b9
+Signer #1 public key MD5 digest: 847316eecdc5ed86a9278fa21d691469
+Signer #1 certificate DN: CN=Safe Bridge UI Preview
+Signer #1 certificate SHA-256 digest: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
+Signer #1 certificate SHA-1 digest: 72eb0604b105c80b88e7de790c82ddfa96d14eb5
+Signer #1 certificate MD5 digest: 3b7fe52026f9f5aa048504ae1c47cf3a
+Signer #1 certificate DN: CN=Safe Bridge UI Preview
+Signer #1 certificate SHA-256 digest: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
+Signer #1 certificate SHA-1 digest: 72eb0604b105c80b88e7de790c82ddfa96d14eb5
+Signer #1 certificate MD5 digest: 3b7fe52026f9f5aa048504ae1c47cf3a
+package: name='com.stange.safebridge.pasteltest' versionCode='6' versionName='0.6.0-private-test' platformBuildVersionName='15' platformBuildVersionCode='35' compileSdkVersion='35' compileSdkVersionCodename='15'
+minSdkVersion:'26'
+targetSdkVersion:'35'
+uses-permission: name='android.permission.ACCESS_COARSE_LOCATION'
+uses-permission: name='android.permission.ACCESS_FINE_LOCATION'
+uses-permission: name='android.permission.FOREGROUND_SERVICE'
+uses-permission: name='android.permission.FOREGROUND_SERVICE_LOCATION'
+uses-permission: name='android.permission.POST_NOTIFICATIONS'
+application-label:'Safe Bridge UI Test'
+application-icon-160:'res/drawable/ic_bridge.xml'
+application: label='Safe Bridge UI Test' icon='res/drawable/ic_bridge.xml'
+feature-group: label=''
+  uses-feature-not-required: name='android.hardware.location'
+  uses-feature-not-required: name='android.hardware.location.gps'
+  uses-feature-not-required: name='android.hardware.location.network'
+  uses-feature: name='android.hardware.faketouch'
+  uses-implied-feature: name='android.hardware.faketouch' reason='default feature for all apps'
+other-activities
+other-services
+supports-screens: 'small' 'normal' 'large' 'xlarge'
+supports-any-density: 'true'
+locales: '--_--'
+densities: '160'
+52e9db584de408428846fb26026d80e657b9c9eb164965038230af2988862b18  build/SafeBridge-0.6.0-private-test.apk
