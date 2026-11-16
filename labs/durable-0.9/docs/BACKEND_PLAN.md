@@ -1,0 +1,7 @@
+# 0.9 current backend and remaining work
+
+The current implemented contract is [protocol 3](../live/backend/API.md); private provisioning/initialization is in [PREPARED_SETUP.md](../live/backend/PREPARED_SETUP.md). Earlier in-memory plans and 0.8 limits are historical records under `history`, not current behavior.
+
+Implemented source: one authoritative encrypted SQLite management database, synchronous transactions and integrity manifest; same generation/session/sequence after intact-database restart; no persisted coordinates; separate prepared reservations and epochs; automatic scoped admission; explicit own-slot reset; offline disable/rotate/enable and authenticated rotation recovery; no global prepared-ticket nonce pool that one reservation can fill; explicit Android resume rather than automatic collection. Exact executed checks and omissions are in the verification record.
+
+Remaining work includes trusted preparation distribution/support, finite-capacity and lost-key decisions, stale-backup disaster recovery, infrastructure retention/logging/access, TLS/domain operations, load/abuse/availability, physical Android and real recipient/browser testing. Multi-instance failover is not implemented. Street-address/private map data is unavailable. No new external service, account, real grant or deployment was created. See `09_TRADEOFFS.md` for concrete options rather than assuming these are hosting-only tasks.

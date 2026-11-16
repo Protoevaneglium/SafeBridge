@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node --test view-state.test.mjs view-network.test.mjs view-deck.test.mjs view-map.test.mjs view-http-v2.test.mjs"}}
