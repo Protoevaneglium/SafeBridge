@@ -1,0 +1,29 @@
+build/
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+*.apk
+__pycache__/
+local.properties
+
+# Live lab management, dependencies and deployment secrets
+node_modules/
+*.enc
+*.crt
+*.cert
+.env
+.env.*
+.local/
+
+# Durable management and private preparation (never source/release artifacts)
+.state/
+.private/
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+*.bundle.json
+prepared-grants.json
+private-grants.json

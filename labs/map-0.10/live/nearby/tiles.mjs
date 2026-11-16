@@ -1,0 +1,6 @@
+import {validPoint} from './model.mjs';
+const MAX_LAT=85.05112878;
+export function worldPixel(p,z){if(!validPoint(p)||!Number.isInteger(z)||z<1||z>18)throw Error('Invalid map view');const lat=Math.max(-MAX_LAT,Math.min(MAX_LAT,p.latitude))*Math.PI/180,size=256*2**z;return{x:(p.longitude+180)/360*size,y:(1-Math.asinh(Math.tan(lat))/Math.PI)/2*size,size};}
+export function tileLayout(origin,z,width=600,height=600){const c=worldPixel(origin,z),n=2**z,tiles=[];const left=c.x-width/2,top=c.y-height/2;for(let y=Math.floor(top/256);y<=Math.floor((top+height-1)/256);y++){if(y<0||y>=n)continue;for(let x=Math.floor(left/256);x<=Math.floor((left+width-1)/256);x++){tiles.push({x:((x%n)+n)%n,y,z,left:x*256-left,top:y*256-top});}}return tiles;}
+export function markerPixel(point,origin,z){const p=worldPixel(point,z),c=worldPixel(origin,z);let dx=p.x-c.x;if(dx>c.size/2)dx-=c.size;if(dx< -c.size/2)dx+=c.size;return{x:300+dx,y:300+p.y-c.y};}
+export function tilePath(template,tile){if(typeof template!=='string'||!/^\/api\/tiles\/\{z\}\/\{x\}\/\{y\}\.png$/.test(template))throw Error('Approved same-origin tile proxy required');return template.replace('{z}',String(tile.z)).replace('{x}',String(tile.x)).replace('{y}',String(tile.y));}

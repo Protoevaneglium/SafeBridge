@@ -1,0 +1,45 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {mkdtemp,writeFile,readFile,rm,stat} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {createSafeBridgeServer} from '../server.mjs';
+import {initializeDurableStore,openDurableStore} from '../durable-store.mjs';
+import {createPreparedGrant,validatePreparedGrantConfig} from '../prepared-admission.mjs';
+const secret=(n=32)=>randomBytes(n).toString('base64url');
+async function harness(t){
+ const dir=await mkdtemp(join(tmpdir(),'safe-bridge-synthetic-admin-')),directory=join(dir,'state'),keyFile=join(dir,'key'),configFile=join(dir,'old-config'),key=randomBytes(32),endpoint='https://synthetic.invalid',created=createPreparedGrant({endpoint});let app=null,origin;
+ t.after(async()=>{await app?.close();await rm(dir,{recursive:true,force:true});});await writeFile(keyFile,key.toString('base64url'),{mode:0o600});const cfg={v:1,endpoint,grants:[created.grant]};await writeFile(configFile,JSON.stringify(cfg),{mode:0o600});initializeDurableStore({directory,stateKey:key,capacity:1,preparedGrants:validatePreparedGrantConfig(cfg,{endpoint,capacity:1})}).close();
+ const cli=new URL('../init-state.mjs',import.meta.url).pathname;function run(args){return spawnSync(process.execPath,[cli,'--state-directory',directory,'--state-key-file',keyFile,...args],{encoding:'utf8',timeout:5000});}
+ async function start(){app=createSafeBridgeServer({development:true,durableStore:openDurableStore({directory,stateKey:key})});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));origin='http://127.0.0.1:'+app.server.address().port;}
+ async function stop(){await app?.close();app=null;}
+ async function call(path,{method='GET',token,body}={}){const headers={'X-SafeBridge-Generation':app.generation};if(token)headers.Authorization='Bearer '+token;if(body!==undefined)headers['Content-Type']='application/json';const res=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});return{status:res.status,value:await res.json()};}
+ async function make(bundle=created.bundle){const config=(await call('/v1/config')).value,creationKey=secret(16),a=await call('/v1/admission',{method:'POST',token:bundle.preparedToken,body:{slotId:bundle.slotId,creationKey,expectedSlotEpoch:null}});assert.equal(a.status,200);const w=secret(),r=secret(),x=secret(),made=await call('/v1/shares',{method:'POST',token:w,body:{generation:app.generation,createPermit:config.createPermit,creationKey,readToken:r,revokeToken:x,durationSeconds:0,requestedExpiresAtMs:0,admissionTicket:a.value.admissionTicket}});assert.equal(made.status,201);return{id:made.value.id,w,r,x,creationKey,meta:made.value};}
+ function inspect(){const store=openDurableStore({directory,stateKey:key});try{return store.load();}finally{store.close();}}
+ return{dir,directory,keyFile,configFile,created,run,start,stop,call,make,inspect};
+}
+const sample=n=>({sequence:n,latitude:0,longitude:0,accuracyM:30,sampleTimeMs:Date.now(),sampleAgeMs:0,approximate:true,mock:true});
+test('offline disable-rotate-enable keeps current Until Stop ID/capabilities until explicit end',async t=>{
+ const h=await harness(t);await h.start();const a=await h.make(),slot=h.created.bundle.slotId;let res=await h.call('/v1/shares/'+a.id+'/latest',{method:'PUT',token:a.w,body:sample(3)});assert.equal(res.status,200);await h.stop();const original=h.inspect(),originalRow=original.sessions[0];
+ let run=h.run(['--disable-prepared-slot',slot]);assert.equal(run.status,0);let snap=h.inspect();assert.equal(snap.grants[0].disabled,true);assert.equal(snap.grants[0].activeSessionId,a.id);for(const field of ['id','readHash','writeHash','revokeHash','sequence','expiresAtMs'])assert.equal(snap.sessions[0][field],originalRow[field]);
+ await h.start();for(const path of ['/v1/admission','/v1/admission/current']){const reset=path.endsWith('current');res=await h.call(path,{method:reset?'DELETE':'POST',token:h.created.bundle.preparedToken,body:reset?{slotId:slot}:{slotId:slot,creationKey:secret(16),expectedSlotEpoch:null}});assert.equal(res.status,404);}res=await h.call('/v1/shares/'+a.id+'/latest',{method:'PUT',token:a.w,body:sample(4)});assert.equal(res.status,200);await h.stop();
+ const bundleFile=join(h.dir,'rotated');run=h.run(['--rotate-prepared-slot',slot,'--bundle-file',bundleFile]);assert.equal(run.status,0);const bundle=JSON.parse(await readFile(bundleFile,'utf8'));assert.equal(bundle.slotId,slot);assert.notEqual(bundle.preparedToken,h.created.bundle.preparedToken);assert.equal((await stat(bundleFile)).mode&0o777,0o600);assert.equal(h.inspect().grants[0].disabled,true);assert.equal(h.inspect().sessions[0].id,a.id);assert.equal(h.inspect().sessions[0].sequence,4);
+ run=h.run(['--enable-prepared-slot',slot]);assert.equal(run.status,0);await h.start();res=await h.call('/v1/admission',{method:'POST',token:h.created.bundle.preparedToken,body:{slotId:slot,creationKey:secret(16),expectedSlotEpoch:null}});assert.equal(res.status,404);res=await h.call('/v1/admission',{method:'POST',token:bundle.preparedToken,body:{slotId:slot,creationKey:secret(16),expectedSlotEpoch:null}});assert.equal(res.status,409);assert.equal(res.value.error,'prepared_slot_active');res=await h.call('/v1/shares/'+a.id+'/status',{token:a.w});assert.equal(res.value.lastSequence,4);assert.equal(res.value.expiresAtMs,0);await h.stop();
+ run=h.run(['--disable-prepared-slot',slot,'--end-current']);assert.equal(run.status,0);snap=h.inspect();assert.equal(snap.sessions[0].state,'stopped');assert.equal(snap.grants[0].activeSessionId,null);assert.equal(snap.sessions[0].expiresAtMs,0);await h.start();res=await h.call('/v1/shares/'+a.id+'/latest',{token:a.r});assert.equal(res.value.state,'stopped');assert.equal(res.value.point,null);await h.stop();
+ run=h.run(['--install-grants','--grants-file',h.configFile]);assert.notEqual(run.status,0);const exported=join(h.dir,'exported');run=h.run(['--export-prepared-grants',exported]);assert.equal(run.status,0);const config=JSON.parse(await readFile(exported,'utf8'));assert.equal(config.v,2);assert.equal(config.grants[0].disabled,true);assert.notEqual(config.grants[0].verifier,h.created.grant.verifier);run=h.run(['--install-grants','--grants-file',exported]);assert.equal(run.status,0);assert.equal(h.inspect().grants[0].disabled,true);
+ for(const output of [run.stdout,run.stderr])assert.equal(output.includes(bundle.preparedToken),false);
+});
+test('authenticated rotation recovery is idempotent and cannot replay end-current on a later share',async t=>{
+ const h=await harness(t);await h.start();const a=await h.make(),slot=h.created.bundle.slotId;await h.stop();const bundleFile=join(h.dir,'new-bundle'),args=['--rotate-prepared-slot',slot,'--bundle-file',bundleFile,'--end-current'];let run=h.run(args);assert.equal(run.status,0);assert.equal(h.inspect().sessions[0].state,'stopped');const bundle=JSON.parse(await readFile(bundleFile,'utf8')),receiptFile=bundleFile+'.rotation.json',receipt=JSON.parse(await readFile(receiptFile,'utf8'));assert.equal(typeof receipt.signature,'string');
+ await h.start();const b=await h.make(bundle);assert.notEqual(a.id,b.id);await h.stop();const epoch=h.inspect().grants[0].epoch;run=h.run([...args,'--recover-rotation']);assert.equal(run.status,0);assert.equal(h.inspect().grants[0].epoch,epoch);assert.equal(h.inspect().grants[0].activeSessionId,b.id);assert.equal(h.inspect().sessions.find(s=>s.id===b.id).state,'waiting_for_fix');
+ await writeFile(receiptFile,JSON.stringify({...receipt,payload:{...receipt.payload,expectedEpoch:receipt.payload.expectedEpoch+1}}),{mode:0o600});run=h.run([...args,'--recover-rotation']);assert.notEqual(run.status,0);assert.match(run.stderr,/authentication/);assert.equal(h.inspect().grants[0].activeSessionId,b.id);
+});
+test('operator flags and publication refuse unknown slot, duplicates, conflicts, overwrite and live database',async t=>{
+ const h=await harness(t),slot=h.created.bundle.slotId,target=join(h.dir,'target');
+ for(const args of [['--disable-prepared-slot',slot,'--end-curent'],['--disable-prepared-slot',slot,'--enable-prepared-slot',slot],['--disable-prepared-slot',slot,'--disable-prepared-slot',slot],['--enable-prepared-slot',slot,'--end-current']]){const run=h.run(args);assert.notEqual(run.status,0);assert.equal(h.inspect().grants[0].disabled,false);}
+ let run=h.run(['--rotate-prepared-slot',secret(16),'--bundle-file',target]);assert.notEqual(run.status,0);await assert.rejects(stat(target),{code:'ENOENT'});
+ await h.start();run=h.run(['--rotate-prepared-slot',slot,'--bundle-file',target]);assert.notEqual(run.status,0);await assert.rejects(stat(target),{code:'ENOENT'});await h.stop();
+ await writeFile(target,'private existing data',{mode:0o600});run=h.run(['--rotate-prepared-slot',slot,'--bundle-file',target]);assert.notEqual(run.status,0);assert.equal(await readFile(target,'utf8'),'private existing data');assert.equal(h.inspect().grants[0].epoch,0);
+});

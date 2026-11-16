@@ -1,0 +1,26 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomBytes} from 'node:crypto';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {spawnSync} from 'node:child_process';
+import {openDurableStore} from '../durable-store.mjs';
+import {createSafeBridgeServer} from '../server.mjs';
+import {createPreparedGrant} from '../prepared-admission.mjs';
+const secret=(n=32)=>randomBytes(n).toString('base64url');
+test('actual private initialization/add-only CLI preserves sessions and rejects live/reinitialization/replacement',async t=>{
+ let app;const dir=await mkdtemp(join(tmpdir(),'safe-bridge-synthetic-operator-'));t.after(async()=>{await app?.close();await rm(dir,{recursive:true,force:true});});const directory=join(dir,'state'),keyFile=join(dir,'state-secret'),configFile=join(dir,'grants'),key=randomBytes(32),endpoint='https://synthetic.invalid',first=createPreparedGrant({endpoint}),second=createPreparedGrant({endpoint});
+ await writeFile(keyFile,key.toString('base64url')+'\n',{mode:0o600});const config=grants=>({v:1,endpoint,grants});await writeFile(configFile,JSON.stringify(config([first.grant])),{mode:0o600});
+ const cli=new URL('../init-state.mjs',import.meta.url).pathname,base=[cli,'--state-directory',directory,'--state-key-file',keyFile,'--grants-file',configFile];const run=extra=>spawnSync(process.execPath,[...base,...extra],{encoding:'utf8'});
+ let result=run(['--approved-origin',endpoint,'--capacity','2']);assert.equal(result.status,0);assert.match(result.stdout,/initialized/);assert.ok(!result.stdout.includes(key.toString('base64url')));assert.ok(!result.stdout.includes(first.bundle.preparedToken));
+ let store=openDurableStore({directory,stateKey:key});app=createSafeBridgeServer({development:true,durableStore:store});await new Promise(r=>app.server.listen(0,'127.0.0.1',r));const generation=app.generation,origin='http://127.0.0.1:'+app.server.address().port;
+ const call=async(path,method,token,body)=>{const headers={'X-SafeBridge-Generation':generation};if(token)headers.Authorization='Bearer '+token;if(body!==undefined)headers['Content-Type']='application/json';const r=await fetch(origin+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body)});return{status:r.status,value:await r.json()};};
+ const cfg=(await call('/v1/config','GET')).value,creationKey=secret(16),admitted=await call('/v1/admission','POST',first.bundle.preparedToken,{slotId:first.bundle.slotId,creationKey,expectedSlotEpoch:null});assert.equal(admitted.status,200);const write=secret(),read=secret(),revoke=secret();const created=await call('/v1/shares','POST',write,{generation,createPermit:cfg.createPermit,creationKey,readToken:read,revokeToken:revoke,durationSeconds:0,requestedExpiresAtMs:0,admissionTicket:admitted.value.admissionTicket});assert.equal(created.status,201);
+ const stopped=await call('/v1/shares/'+created.value.id,'DELETE',revoke);assert.equal(stopped.value.state,'stopped');
+ result=run(['--install-grants']);assert.notEqual(result.status,0);assert.match(result.stderr,/cannot be opened or authenticated/);await app.close();
+ await writeFile(configFile,JSON.stringify(config([first.grant,second.grant])),{mode:0o600});result=run(['--install-grants']);assert.equal(result.status,0);assert.match(result.stdout,/installed/);
+ store=openDurableStore({directory,stateKey:key});const saved=store.load();assert.equal(saved.metadata.generation,generation);assert.equal(saved.grants.length,2);assert.equal(saved.sessions[0].id,created.value.id);assert.equal(saved.sessions[0].state,'stopped');assert.equal(saved.grants.find(g=>g.slotId===first.bundle.slotId).epoch,1);assert.equal(saved.grants.find(g=>g.slotId===second.bundle.slotId).epoch,0);store.close();
+ result=run(['--approved-origin',endpoint,'--capacity','2']);assert.notEqual(result.status,0);assert.equal(result.stdout,'');
+ await writeFile(configFile,JSON.stringify(config([{slotId:first.grant.slotId,verifier:secret()},second.grant])),{mode:0o600});result=run(['--install-grants']);assert.notEqual(result.status,0);assert.match(result.stderr,/replace/);store=openDurableStore({directory,stateKey:key});assert.equal(store.load().grants.find(g=>g.slotId===first.bundle.slotId).verifier,first.grant.verifier);assert.equal(store.load().metadata.generation,generation);store.close();
+});

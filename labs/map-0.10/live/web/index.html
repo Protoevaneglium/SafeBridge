@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <title>Shared location · Safe Bridge</title>
+  <link rel="stylesheet" href="/view.css">
+  <script type="module" src="/view.js"></script>
+</head>
+<body>
+  <main>
+    <header class="intro"><p class="eyebrow brand">SAFE BRIDGE · PRIVATE TEST</p><h1>Shared location</h1></header>
+    <section class="status-card" aria-labelledby="status-title">
+      <p class="eyebrow" id="status-label">CHECKING LINK</p>
+      <h2 id="status-title">Connecting…</h2>
+    </section>
+    <div class="actions"><button id="refresh" type="button" aria-label="Refresh location status">Refresh</button><button id="clear" type="button" class="secondary" aria-label="Clear the viewing link and location from this page">Clear</button><button id="open-map" type="button" aria-label="Read disclosure before opening an external map" disabled>Map</button></div>
+    <button id="live-map-toggle" type="button" disabled>Live position plot</button>
+    <section id="live-map-panel" hidden aria-label="Updating recipient position visualization">
+      <p id="live-map-status" role="status"></p>
+      <svg id="live-map-svg" viewBox="0 0 600 600" role="img" aria-label="Latest verified or labeled last-known position"></svg>
+      <button id="live-map-streets" type="button">Check street-map option</button>
+    </section>
+    <section id="deck-content" class="glass" tabindex="-1" aria-label="Paged recipient information"></section>
+    <nav class="page-navigation" aria-label="Recipient pages">
+      <button id="page-previous" class="page-arrow secondary" type="button" aria-label="Previous page">‹</button>
+      <div class="page-center"><p id="page-index">Position</p><button id="page-mode" class="secondary" type="button" aria-label="Show privacy pages">Privacy</button></div>
+      <button id="page-next" class="page-arrow secondary" type="button" aria-label="Next page">›</button>
+    </nav>
+    <p class="sr-only" id="page-announcer" role="status" aria-live="polite" aria-atomic="true"></p>
+    <p class="sr-only" id="status-announcer" role="status" aria-live="polite" aria-atomic="true"></p>
+    <noscript><p class="no-script">JavaScript is required to verify updates. No location is shown. This page cannot dispatch help.</p></noscript>
+  </main>
+  <div id="content-source" hidden aria-hidden="true">
+    <p id="status-message">Checking whether this link can show a location.</p><p id="retry-message"></p>
+    <section id="position-card" hidden>
+      <h2 id="position-title">Reported device position</h2><p id="position-warning" class="warning" hidden></p>
+      <dl>
+        <div><dt>Latitude</dt><dd id="latitude"></dd></div><div><dt>Longitude</dt><dd id="longitude"></dd></div>
+        <div><dt>Estimated horizontal accuracy</dt><dd id="accuracy"></dd></div><div><dt>Fix age</dt><dd id="fix-age"></dd></div>
+        <div><dt>Street address</dt><dd id="street-address">Street address unavailable; coordinates are a device estimate.</dd></div>
+        <div><dt>Fix time · UTC, from device</dt><dd id="fix-time"></dd></div><div><dt>Last server check · UTC</dt><dd id="checked-time"></dd></div>
+      </dl><p class="subtle">Accuracy is an estimated radius, not a guaranteed boundary. The device may have moved since this fix.</p>
+    </section>
+    <section id="privacy-source">
+      <h2>A link can be forwarded</h2>
+      <p>Anyone with this link can view available location updates until sharing ends. Keep it only with people you trust. No app or account is needed to view this page.</p>
+      <p class="warning">This page is not emergency response. It does not dispatch help or confirm that the person is safe.</p>
+      <h3>Activity can leave traces</h3>
+      <p>Device activity, browsing, copied links and messages may be monitored or leave records. Removing a link from the address bar or clearing this page cannot erase browser, clipboard, message or device records.</p>
+      <h3>Updates have limits</h3>
+      <p>Location can be approximate, old, inaccurate or unavailable. The sender’s device, permission, battery, connection or Android controls can interrupt updates. An interrupted connection does not tell you why, or whether the person is safe.</p>
+      <h3>What the service receives</h3>
+      <p>The service operator processes the sender’s coordinates. HTTPS protects transport; this is not end-to-end encrypted. The server keeps the latest accepted point rather than a route history, but recipients can keep copies.</p>
+      <h3>Last known and external maps</h3>
+      <p>During connection loss this tab can retain its last received coordinates in memory, clearly marked unverified with their timestamp, age and accuracy. Paused updates are not a Stop. A reload cannot recover that tab-only point from storage. A confirmed Stop, chosen expiry or Clear removes it from this page; previously saved copies remain outside its control.</p>
+      <p>The optional Map action opens Google Maps only after disclosure and your explicit choice. Google receives the chosen last-known coordinates and device/network data under its own privacy policy. No viewing token, share identifier or generation is included in the map URL, and the action sends no page referrer. No map tiles, address lookup or geocoding load automatically.</p>
+      <h3>What this page uses</h3>
+      <p>This page does not request your location or automatically load third-party content. The optional live position plot updates from verified responses. Street tiles require a configured service and explicit consent; the displayed area may then be sent through the operator to its disclosed map provider. It keeps the viewing credential in page memory, without local storage, session storage or cookies. Refreshing or reopening the cleaned address may require the original link.</p>
+      <p>Independent safety-resource prototype. No guarantee of continuous updates or concealment.</p>
+    </section>
+  </div>
+</body>
+</html>
