@@ -1,27 +1,30 @@
-# Safe Bridge 0.3.0-preview verification
-
-## Source provenance
-The local 0.2 MainActivity matched the current GitHub default-branch file byte-for-byte before changes. Implementation was prepared in a separate local source copy, leaving the original 0.2 local project untouched. This source publication follows the reviewed 0.3 archive; README preserves the repository's earlier safety notes.
+# Safe Bridge 0.4.0-preview verification
+## Provenance and scope
+Derived from local 0.3 source in safe-bridge-glass. UI-only reference blend: mint hero, pastel resource accents and rounded translucent cards. Original artwork, not a copy of the reference illustrations. No feature, service, permissions or external action scope added.
 
 ## Passed
-- Android 35 native resource compilation, Java 17 target compilation and D8 packaging.
-- Static manifest/privacy, route, allowed-domain, disclosure, emergency and calculator exit/alias checks.
-- Explicit button accessibility role for resource cards; their child labels are hidden from separate accessibility focus. All custom action backgrounds provide pressed and keyboard-focus states. Static structure checked only, not TalkBack runtime verified.
-- 21 host calculator arithmetic, repeated action, reset and error tests.
-- APK signature v2/v3 verification, same certificate SHA-256 as 0.2: fd120267b316240c9c7246f8f2c789cbfc3486165068fc0f98fb9564993bb11d.
-- APK package com.stange.safebridge.preview, versionCode 3, min26/target35.
-- No added permissions, external libraries, artwork, network access, analytics, report backend or automatic calling.
+- Android 35 resources, Java 17 compilation and D8 packaging.
+- Static manifest, resource allowlist, emergency/external confirmations, calculator escapes and accessibility-role/state checks.
+- 21 freshly compiled host calculator arithmetic/reset/error tests.
+- No added permissions, analytics, accounts, network code or background rendering loop.
+
+## Install boundary
+Prior signing password is unavailable. A separate test package com.stange.safebridge.pasteltest uses a new private test signer. It does not replace the existing preview or transfer its launcher/settings state. Signing keys are excluded from source.
 
 ## Not run
-No emulator, ADB or attached Android test device is present in this environment. The native UI has not been visually rendered or interaction-tested here. Compilation does not prove accessibility, layout, safety or update behavior.
+No ADB, emulator or Android test device available. Native UI appearance, large text, TalkBack, launcher alias switching, update/install behavior and interruption flows are not runtime verified. Compilation is not a safety certification.
 
-## Device acceptance checks (do not place calls or submit reports)
-- Install over 0.2 without uninstalling; verify calculator launcher mode is preserved if selected.
-- Check home, all guidance routes, scrolling, Back and Close, portrait/landscape, large text and TalkBack.
-- Confirm emergency dialog then Cancel only. Do not call 911 for testing.
-- Check external confirmations and missing-handler cases with mocks only. Calculator must stay reachable from dialogs.
-- Calculator arithmetic, long-press = return/cancel, Back exit, interruption/relaunch and launcher icon refresh.
-- Verify display readability and touch targets with actual S24 settings. Some launchers cache old icons.
+## Device checks
+Check all routes, scrolling, portrait/landscape and large fonts. Verify TalkBack card names and controls. Emergency dialog: Cancel only, never place a test 911 call. Test external dialogs and missing handlers with mocks, not real reports. Test calculator return/cancel, Back/Close and launcher cache behavior.
 
-## Known retained limitations
-Calculator is a visual disguise only; app settings/history/monitoring can reveal it. External app traces are uncontrolled. Rotation currently resets support navigation and calculator entry. No authenticated lock or universal concealment guarantee. U.S.-only prototype; independent safety/accessibility/survivor review remains necessary before public use.
+## Known limits
+U.S.-only prototype. Disguise is visual only and app/settings/history/monitoring can reveal it. Rotation resets navigation and calculator entry. External app traces are uncontrolled. Survivor/privacy/accessibility review is still needed before public deployment.
+
+## Independent source review and package
+Source review found no blocking regressions. New icon contrast 9.60–10.48:1; frame contrast at least 11.84:1, calculated (not device measured).
+APK v2/v3 signature verified. Package metadata checked: versionCode 4, min26/target35.
+Certificate SHA-256: c879898f4a5bc589a98c3cce4b94732feded817cd53bc630908b9c7f00dffcbe
+APK SHA-256: 3d912fbebecea0133543fce1827b09144021b2d41eecc6defa08700e6ea50232
+
+## Source publication check
+The 0.4 UI test source is published on branch `ui-test-0.4`, separate from the main 0.3 application baseline. Static checks were rerun successfully during publication. The recorded build and 21 calculator test results above are prior build-stage results; a publication-time calculator rerun was unavailable because `javac` was not on PATH. No new Android runtime or device tests are claimed. No APK or signing key is included.

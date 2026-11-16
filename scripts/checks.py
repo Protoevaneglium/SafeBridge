@@ -29,7 +29,7 @@ assert 'if(section.equals("calculator")){finishAndRemoveTask();return;}' in s
 aliases=m.find('application').findall('activity-alias')
 assert len(aliases)==2
 assert {x.get(a+'enabled') for x in aliases}=={'true','false'}
-assert {x.get(a+'label') for x in aliases}=={'Safe Bridge Preview','Calculator'}
+assert {x.get(a+'label') for x in aliases}=={'Safe Bridge UI Test','Calculator'}
 assert all(x.get(a+'targetActivity')=='com.stange.safebridge.MainActivity' for x in aliases)
 print('PASS: emergency-only dialer, persistent launcher aliases, calculator exit and explicit disguise limits (static only)')
 
