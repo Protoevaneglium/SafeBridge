@@ -2,6 +2,9 @@ package com.stange.safebridge;
 
 import android.app.*;
 import android.os.Bundle;
+import android.os.SystemClock;
+import android.Manifest;
+import android.location.Location;
 import android.content.*;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -10,17 +13,23 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.StateListDrawable;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.*;
 import android.widget.*;
 
-/** Static, permission-free guidance. No network, storage, analytics or reporting backend. */
+/** Offline guidance plus optional on-device location; no app network, storage or reporting backend. */
 public class MainActivity extends Activity {
     private final int ink=Color.rgb(19,46,70), teal=Color.rgb(17,88,154);
-    private static final String HOTLINE_POLICY="Your name and identifying details are optional. The hotline generally requires explicit consent to disclose identifying information, but reports suspected abuse of a minor, potential harm to you or others, and situations legally requiring a report. Read its policy before sharing.";
-    private static final String CYBERTIP_POLICY="If you submit a CyberTipline report, NCMEC analysts process it and make it available to the appropriate law enforcement agency. Opening this page does not submit a report. You decide whether to complete and submit the official form.";
+    private static final String HOTLINE_POLICY="Your name and identifying details are optional. The hotline generally needs consent to share identifying information, with exceptions for child abuse, potential harm and legal reporting duties. Its policy applies.";
+    private static final String CYBERTIP_POLICY="Opening this page does not submit a report. If you submit, NCMEC makes every report available to law enforcement. Submitted reports cannot be canceled. Your name and contact details are optional.";
+    private static final String PEER_POLICY="Peer groups are not emergency response. Other participants may copy what you share. Browser, email and call activity may be monitored or leave traces. Review the service rules and privacy terms.";
     private LinearLayout page; private String section="home";
     private PageDeck deck;
+    private int[] restoredAnchor;
+    private final NavigationState navigation=new NavigationState();
+    private LocationSnapshot locationRequest;
+    private LocationFix locationFix;
+    private String locationMessage="No location requested. Nothing is being sent.";
+    private int permissionPurpose=0, sessionMinutes=15;
     private final Calculator calculator=new Calculator();
     private TextView calculation;
     private boolean isCloaked(){return getPackageManager().getComponentEnabledSetting(new ComponentName(this,"com.stange.safebridge.CalculatorLauncher"))==PackageManager.COMPONENT_ENABLED_STATE_ENABLED;}
@@ -28,14 +37,25 @@ public class MainActivity extends Activity {
         PackageManager pm=getPackageManager();
         pm.setComponentEnabledSetting(new ComponentName(this,enabled?"com.stange.safebridge.CalculatorLauncher":"com.stange.safebridge.SafeLauncher"),PackageManager.COMPONENT_ENABLED_STATE_ENABLED,PackageManager.DONT_KILL_APP);
         pm.setComponentEnabledSetting(new ComponentName(this,enabled?"com.stange.safebridge.SafeLauncher":"com.stange.safebridge.CalculatorLauncher"),PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);
-        calculator.reset();show(enabled?"calculator":"home");
+        calculator.reset();navigation.reset();render(enabled?"calculator":"home",0);
     }
     private int dp(float n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
-    @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setStatusBarColor(Color.rgb(230,245,246));getWindow().setNavigationBarColor(Color.rgb(233,239,250));show(isCloaked()?"calculator":"home");}
+    @Override public void onCreate(Bundle state){super.onCreate(state);getWindow().setStatusBarColor(Color.rgb(230,245,246));getWindow().setNavigationBarColor(Color.rgb(233,239,250));
+        if(state!=null){navigation.restore(state.getStringArray("routes"),state.getIntArray("pages"));restoredAnchor=state.getIntArray("anchor");}
+        render(isCloaked()?"calculator":navigation.route(),navigation.page());
+    }
+    @Override protected void onResume(){super.onResume();if(!LocationSnapshot.hasPermission(this))locationFix=null;getWindow().getDecorView().post(this::refreshLocation);}
+    @Override protected void onPause(){if(locationRequest!=null){if(locationRequest.isRequesting())locationMessage="The pending location request was canceled on leaving this screen. Tap Get a location fix to try again.";locationRequest.cancel();}super.onPause();}
+    @Override protected void onDestroy(){if(locationRequest!=null)locationRequest.cancel();PagedDialog.dismissFor(this);super.onDestroy();}
+    @Override protected void onSaveInstanceState(Bundle state){if(!section.equals("calculator")){navigation.updatePage(deck.getPageIndex());state.putIntArray("anchor",deck.getReadingAnchor());}state.putStringArray("routes",navigation.routes());state.putIntArray("pages",navigation.pages());super.onSaveInstanceState(state);}
+    private void show(String name){if(PagedDialog.isShowing(this))return;navigation.go(name,deck==null?0:deck.getPageIndex());render(navigation.route(),navigation.page());}
+
     private TextView text(String s,int size,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(ink);t.setLineSpacing(dp(3),1);if(bold)t.setTypeface(null,Typeface.BOLD);t.setPadding(0,dp(5),0,dp(8));return t;}
     private void add(String s){page.addView(text(s,16,false));}
-    private void title(String s){page.addView(text(s,28,true));}
+    private void title(String s){TextView t=text(s,24,true);if(android.os.Build.VERSION.SDK_INT>=28)t.setAccessibilityHeading(true);page.addView(t);}
     private GradientDrawable box(int c){GradientDrawable g=new GradientDrawable();g.setColor(c);g.setCornerRadius(dp(24));g.setStroke(dp(1),Color.argb(210,255,255,255));return g;}
+    private int choiceColor(String route){switch(route){case "urgent":case "peers":return 0xD99EE1EF;case "findme":case "tools":return 0xD9A3EED9;case "quiet":return 0xD9DCD8F5;case "staying":return 0xD9F5CBE6;case "signs":return 0xD9FFE6BA;default:return 0xD9FFFFFF;}}
+    private GradientDrawable tintedGlass(int color){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{color,0xD9F8FCFF});g.setCornerRadius(dp(24));g.setStroke(dp(1),Color.WHITE);return g;}
     private GradientDrawable glass(){GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xCBFFFFFF,0xAFEFF9FC});g.setCornerRadius(dp(26));g.setStroke(dp(1),0xFFFFFFFF);return g;}
     private void surface(View v){v.setBackground(glass());v.setElevation(dp(2));}
     private void interactive(View view,Drawable normal,int color,boolean dark){
@@ -47,49 +67,103 @@ public class MainActivity extends Activity {
         states.addState(new int[]{},normal);view.setBackground(states);
     }
     private void note(String s){TextView t=text(s,14,false);t.setPadding(dp(18),dp(16),dp(18),dp(16));surface(t);LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(12),0,dp(14));page.addView(t,p);}
-    private Button control(String s,Runnable action){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(ink);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(48));b.setPadding(dp(16),dp(10),dp(16),dp(10));surface(b);interactive(b,glass(),0xFFF1F8FF,false);b.setOnClickListener(v->action.run());return b;}
+    private Button control(String s,Runnable action){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(14);b.setTextColor(ink);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(48));b.setPadding(dp(16),dp(10),dp(16),dp(10));surface(b);interactive(b,glass(),0xFFF1F8FF,false);b.setOnClickListener(v->{if(!PagedDialog.isShowing(this))action.run();});return b;}
     private void button(String s,Runnable action,boolean primary){Button b=control(s,action);b.setTextSize(16);b.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);b.setPadding(dp(20),dp(18),dp(20),dp(18));b.setMinHeight(dp(60));if(primary){b.setTextColor(Color.WHITE);interactive(b,box(teal),teal,true);}LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.setMargins(0,dp(6),0,dp(6));page.addView(b,p);}
     private void route(String label,String dest){button(label,()->show(dest),false);}
-    private void resource(String symbol,String heading,String detail,String dest,int accent){
-        LinearLayout card=new LinearLayout(this);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(16),dp(14),dp(18),dp(14));surface(card);interactive(card,glass(),0xFFF1F8FF,false);
-        TextView icon=text(symbol,23,true);icon.setGravity(Gravity.CENTER);icon.setPadding(0,0,0,0);icon.setBackground(box(accent));icon.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(icon,new LinearLayout.LayoutParams(dp(52),dp(52)));
-        LinearLayout labels=new LinearLayout(this);labels.setOrientation(LinearLayout.VERTICAL);labels.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);labels.setPadding(dp(14),0,dp(8),0);TextView h=text(heading,18,true);h.setPadding(0,0,0,dp(4));labels.addView(h);TextView d=text(detail,14,false);d.setPadding(0,0,0,0);labels.addView(d);card.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
-        TextView arrow=text("›",26,false);arrow.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);card.addView(arrow);card.setClickable(true);card.setFocusable(true);card.setContentDescription(heading+". "+detail);card.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);card.setAccessibilityDelegate(new View.AccessibilityDelegate(){@Override public void onInitializeAccessibilityNodeInfo(View host,AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());info.setClickable(true);}});card.setOnClickListener(v->show(dest));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(6),0,dp(6));page.addView(card,lp);
+    private void choices(String a,String targetA,String b,String targetB){
+        LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);
+        Button left=control(a,()->show(targetA)),right=control(b,()->show(targetB));left.setTextSize(16);right.setTextSize(16);left.setMinHeight(dp(58));right.setMinHeight(dp(58));
+        interactive(left,tintedGlass(choiceColor(targetA)),choiceColor(targetA),false);interactive(right,tintedGlass(choiceColor(targetB)),choiceColor(targetB),false);
+        LinearLayout.LayoutParams l=new LinearLayout.LayoutParams(0,-2,1);l.setMargins(0,dp(4),dp(4),dp(4));row.addView(left,l);
+        LinearLayout.LayoutParams r=new LinearLayout.LayoutParams(0,-2,1);r.setMargins(dp(4),dp(4),0,dp(4));row.addView(right,r);page.addView(row);
     }
-    /** Original typographic hero; no reference illustrations or mood data. */
-    private void welcome(){
-        LinearLayout hero=new LinearLayout(this);hero.setOrientation(LinearLayout.VERTICAL);hero.setPadding(dp(22),dp(22),dp(22),dp(24));
-        GradientDrawable background=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xE6DEFFF4,0xE6D9F2FC});
-        background.setCornerRadius(dp(30));background.setStroke(dp(1),Color.WHITE);hero.setBackground(background);
-        TextView eyebrow=text("SUPPORT AT YOUR PACE",12,true);eyebrow.setLetterSpacing(.08f);hero.addView(eyebrow);
-        TextView heading=text("Your next step.\nYour choice.",30,true);hero.addView(heading);
-        hero.addView(text("Find support and understand your options, one step at a time.",16,false));
-        TextView badge=text("Independent • Links to existing services",12,true);badge.setPadding(dp(12),dp(9),dp(12),dp(9));badge.setBackground(box(0xDAFFFFFF));
-        LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(-2,-2);bp.setMargins(0,dp(12),0,0);hero.addView(badge,bp);
-        LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,-2);hp.setMargins(0,dp(6),0,dp(4));page.addView(hero,hp);
-    }
+    private void detail(String label,String message){button(label,()->new PagedDialog.Builder(this).setTitle(label).setMessage(message).setNegativeButton("Close",null).setNeutralButton("Calculator",(d,w)->cloak(true)).show(),false);}
     private void link(String label,String url){button(label,()->external(label,url),true);}
     private void external(String label,String url){
+        if(PagedDialog.isShowing(this))return;
         boolean dial=url.startsWith("tel:");
         if(url.equals("tel:911")){emergency();return;}
         String disclosure="";
         if(url.equals("tel:18883737888") || url.startsWith("https://humantraffickinghotline.org/")) disclosure=HOTLINE_POLICY+"\n\n";
         if(url.startsWith("https://report.cybertip.org/") || url.startsWith("https://www.missingkids.org/gethelpnow/cybertipline")) disclosure=CYBERTIP_POLICY+"\n\n";
+        if(url.startsWith("https://rainn.org/") || url.startsWith("https://1in6.org/") || url.startsWith("https://www.aftersilence.org/") || url.contains("/teamhope"))disclosure=PEER_POLICY+"\n\n";
+        if(url.startsWith("https://rainn.org/"))disclosure+="RAINN Youth HelpRoom is for ages 14–24. Current sessions are unverified. Moderators are mandatory reporters; identifying details may lead to a report to authorities.\n\n";
+        if(url.startsWith("https://www.aftersilence.org/"))disclosure+="After Silence is 18+. Joining needs birth date, email validation and moderator approval. Communications are not private.\n\n";
+        if(url.startsWith("https://1in6.org/"))disclosure+="1in6 groups are for male-identifying survivors 18+. Third-party JotCast terms apply; chats are not fully confidential.\n\n";
+        if(url.startsWith("https://takeitdown.ncmec.org/"))disclosure="Do not download or ask someone to send an image to use this tool. Use the device where it was originally taken. Images remain on your device; matching is limited to participating public or unencrypted services.\n\n";
         new PagedDialog.Builder(this).setTitle(dial?"Open phone dialer?":"Leave Safe Bridge?")
-        .setMessage(disclosure+(dial?"The dialer opens with this number. You choose whether to place the call. Calls may appear in phone or carrier records.\n\n":"This opens your browser. The website has its own privacy practices. Browser history, device monitoring or network records may reveal activity. No report is sent by this app.\n\n")+url)
+        .setMessage(disclosure+(dial?"The dialer opens with this number. You choose whether to place the call. Calls may appear in phone or carrier records.\n\n":"Your browser opens an independent service with its own privacy rules. Device activity, links and browsing may be monitored or leave records. Safe Bridge sends no report.\n\n")+url)
         .setNeutralButton("Calculator",(d,w)->cloak(true)).setNegativeButton("Cancel",null).setPositiveButton(dial?"Open dialer":"Open website",(d,w)->{
             try{startActivity(new Intent(dial?Intent.ACTION_DIAL:Intent.ACTION_VIEW,Uri.parse(url)));}
-            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("No compatible app found").setMessage("Use another safe device or compatible browser/phone app. Address or number:\n"+url).setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
+            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("No compatible app found").setMessage("Use another safe device or compatible browser/phone app. Address or number:\n"+url).setNeutralButton("Calculator",(dialog,which)->cloak(true)).setNegativeButton("Close",null).show();}
         }).show();
     }
     private void emergency(){
+        if(PagedDialog.isShowing(this))return;
         new PagedDialog.Builder(this).setTitle("Emergency • U.S. 911")
         .setMessage("Open 911 in your phone dialer? You must then tap Call in the phone app. Safe Bridge does not call automatically, dispatch help or send your location. Calls can leave records. Do not test with a real emergency call.")
         .setNeutralButton("Calculator",(d,w)->cloak(true)).setNegativeButton("Cancel",null).setPositiveButton("Open 911 dialer",(d,w)->{
             try{startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:911")));}
-            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("Phone dialer unavailable").setMessage("This device cannot open a phone dialer. Use a phone to call 911 in the U.S. if safe.").setNeutralButton("Calculator",(dialog,which)->cloak(true)).setPositiveButton("Close",null).show();}
+            catch(ActivityNotFoundException e){new PagedDialog.Builder(this).setTitle("Phone dialer unavailable").setMessage("This device cannot open a phone dialer. Use a phone to call 911 in the U.S. if safe.").setNeutralButton("Calculator",(dialog,which)->cloak(true)).setNegativeButton("Close",null).show();}
         }).show();
     }
+    private LocationFix availableFix(){
+        if(!LocationSnapshot.hasPermission(this)){locationFix=null;return null;}
+        boolean fine=checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED;
+        if(locationFix!=null && !locationFix.approximatePermission && !fine)locationFix=null;
+        Location recent=LocalLocationService.latest();
+        LocationFix updating=recent==null?null:LocationSnapshot.fromLocation(recent,checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED,LocationFix.Source.DEVICE_SESSION);
+        if(updating!=null && (locationFix==null || updating.fixElapsedRealtimeNanos>locationFix.fixElapsedRealtimeNanos))return updating;
+        return locationFix;
+    }
+    private void refreshLocation(){if(!isFinishing() && !isDestroyed() && section.equals("findme") && !PagedDialog.isShowing(this))render("findme",deck.getPageIndex());}
+    private void obtainFix(boolean cached){
+        if(locationRequest!=null)locationRequest.cancel();
+        locationMessage=cached?"Checking last-known location; it may be old.":"Requesting a location fix. This may take up to 20 seconds.";
+        locationRequest=new LocationSnapshot(this,new LocationSnapshot.Callback(){
+            public void onSnapshot(LocationFix fix){locationFix=fix;locationMessage="Snapshot available. Nobody has received it from Safe Bridge.";refreshLocation();}
+            public void onFailure(String reason){locationMessage=reason;refreshLocation();}
+        });
+        if(cached)locationRequest.lastKnown();else locationRequest.request();refreshLocation();
+    }
+    private void locationPermission(int purpose){
+        if(permissionPurpose!=0)return;
+        if(!LocationSnapshot.hasPermission(this)){permissionPurpose=purpose;requestPermissions(new String[]{Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION},101);return;}
+        if(purpose==1 || purpose==3){obtainFix(purpose==3);return;}
+        if(android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){permissionPurpose=2;requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS},102);return;}
+        launchLocalSession();
+    }
+    @Override public void onRequestPermissionsResult(int request,String[] names,int[] results){super.onRequestPermissionsResult(request,names,results);if(request!=101 && request!=102)return;int purpose=permissionPurpose;permissionPurpose=0;
+        if(purpose<1 || purpose>3){locationMessage="No active location request was restored. Choose a Find Me action to continue.";refreshLocation();return;}
+        if(!section.equals("findme")){locationMessage="Permission returned after leaving Find Me. No session started.";return;}
+        if(!LocationSnapshot.hasPermission(this)){locationMessage="Location permission was not granted. Guidance still works. You can change permission in Android app settings if safe.";refreshLocation();return;}
+        if(request==102 && android.os.Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){locationMessage="Notifications were not allowed. On-device updating was not started; one-time snapshots remain available.";refreshLocation();return;}
+        locationPermission(purpose);
+    }
+    private void confirmLocalSession(int minutes){sessionMinutes=minutes;
+        new PagedDialog.Builder(this).setTitle("Keep location updated on this device?").setMessage("This does not share live location. It keeps the latest fix on this device only, for up to "+minutes+" minutes. A visible location notification and system indicators may reveal use. Calculator and Close do not stop it; use Stop updates. Android can stop the app, and fixes or expiry cleanup can be delayed. No background-location permission or automatic restart is used.").setNegativeButton("Cancel",null).setNeutralButton("Calculator",(d,w)->cloak(true)).setPositiveButton("Start "+minutes+" minutes",(d,w)->locationPermission(2)).show();
+    }
+    private void launchLocalSession(){
+        if(!section.equals("findme"))return;
+        try{Intent service=new Intent(this,LocalLocationService.class).setAction(LocalLocationService.ACTION_START);service.putExtra(LocalLocationService.EXTRA_DURATION_MINUTES,sessionMinutes);startForegroundService(service);locationMessage="Starting on-device updates. No live link and no automatic sharing.";}
+        catch(RuntimeException e){locationMessage="Android could not start on-device updates. Nothing is being shared. Check location and notification settings if safe.";}
+        refreshLocation();getWindow().getDecorView().postDelayed(this::refreshLocation,500);
+    }
+    private void stopLocation(){stopService(new Intent(this,LocalLocationService.class));locationFix=null;locationMessage="On-device updates stopped. Already copied or shared snapshots cannot be recalled.";
+        getWindow().getDecorView().postDelayed(()->{if(isFinishing() || isDestroyed())return;if(section.equals("calculator"))render("calculator",0);else refreshLocation();},100);
+    }
+    private void exportSnapshot(boolean copy){
+        final LocationFix fix=availableFix();if(fix==null){locationMessage="Get a fix before copying or sharing.";refreshLocation();return;}
+        String warning="This exports one snapshot, not live tracking. "+(fix.isStale(SystemClock.elapsedRealtimeNanos())?"This fix is stale. ":"")+"The receiving app, clipboard or recipient may retain or forward it. Opening a sharing screen does not mean anyone received it. Safe Bridge cannot recall copies.";
+        new PagedDialog.Builder(this).setTitle(copy?"Copy location snapshot?":"Share location snapshot?").setMessage(fix.summary(SystemClock.elapsedRealtimeNanos())+"\n\n"+warning).setNegativeButton("Cancel",null).setNeutralButton("Calculator",(d,w)->cloak(true)).setPositiveButton(copy?"Copy snapshot":"Choose app & recipient",(d,w)->{
+            if(!LocationSnapshot.hasPermission(this) || (!fix.approximatePermission && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)){locationFix=null;locationMessage="Location permission changed. No snapshot exported.";refreshLocation();return;}
+            String value=fix.shareText(SystemClock.elapsedRealtimeNanos());
+            if(copy){android.content.ClipData clip=android.content.ClipData.newPlainText("Location snapshot",value);if(android.os.Build.VERSION.SDK_INT>=33){android.os.PersistableBundle extras=new android.os.PersistableBundle();extras.putBoolean("android.content.extra.IS_SENSITIVE",true);clip.getDescription().setExtras(extras);}((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(clip);locationMessage="Snapshot copied to Android clipboard. Clipboard/sync records may retain it.";}
+            else try{Intent send=new Intent(Intent.ACTION_SEND);send.setType("text/plain");send.putExtra(Intent.EXTRA_TEXT,value);startActivity(Intent.createChooser(send,"Choose app and recipient"));locationMessage="Android sharing screen opened. Sending and receipt are not confirmed.";}catch(ActivityNotFoundException e){locationMessage="No compatible sharing app opened. No receipt is confirmed.";}
+            refreshLocation();
+        }).show();
+    }
+    private void snapshotButton(String label,boolean copy){Button b=control(label,()->exportSnapshot(copy));boolean ready=availableFix()!=null;b.setEnabled(ready);b.setAlpha(ready?1f:.5f);page.addView(b,new LinearLayout.LayoutParams(-1,-2));}
     private void calculatorPage(){
         
         calculation=text(calculator.display(),28,true);calculation.setGravity(Gravity.END);calculation.setPadding(dp(12),dp(8),dp(12),dp(8));calculation.setBackground(box(Color.WHITE));page.addView(calculation);
@@ -100,56 +174,181 @@ public class MainActivity extends Activity {
             for(String key:rows[r]){Button b=new Button(this);b.setText(key);b.setTextSize(23);b.setTextColor(ink);b.setAllCaps(false);b.setMinHeight(dp(48));interactive(b,box(colors[r]),colors[r],false);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),dp(5),dp(3),dp(5));row.addView(b,lp);
                 b.setOnClickListener(v->{calculator.key(key);calculation.setText(calculator.display());});
                 if(key.equals("=")){b.setOnLongClickListener(v->{new PagedDialog.Builder(this).setTitle("Change view?").setMessage("Return to Safe Bridge? Its name and icon will become visible again.").setNegativeButton("Cancel",null).setPositiveButton("Return",(d,w)->cloak(false)).show();return true;});}
-            }page.addView(row,new LinearLayout.LayoutParams(-1,0,1));
+            }page.addView(row,new LinearLayout.LayoutParams(-1,-2));
         }
     }
-    private void show(String name){section=name;
+    private void render(String name,int pageIndex){if(section.equals("findme") && !name.equals("findme") && locationRequest!=null){if(locationRequest.isRequesting())locationMessage="Location request canceled on leaving Find Me.";locationRequest.cancel();}section=name;
         page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);
         deck=new PageDeck(this);
         LinearLayout frame=new LinearLayout(this);frame.setOrientation(LinearLayout.VERTICAL);frame.setBackground(new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{0xFFE6F5F6,0xFFD9F1F4,0xFFE9EFFA}));setContentView(frame);
         frame.setOnApplyWindowInsetsListener((v,i)->{v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
-        LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);TextView brand=text(name.equals("calculator")?"Calculator":"Safe Bridge",21,true);top.addView(brand,new LinearLayout.LayoutParams(0,-2,1));top.addView(control("Close",()->finishAndRemoveTask()));top.setPadding(dp(22),dp(12),dp(20),dp(12));frame.addView(top);if(getResources().getConfiguration().screenHeightDp<500)top.setVisibility(View.GONE);
-        if(!name.equals("calculator")){LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(20),0,dp(20),dp(8));Button panic=control("Emergency • 911",()->emergency());panic.setTextColor(Color.WHITE);interactive(panic,box(Color.rgb(163,32,56)),Color.rgb(163,32,56),true);panic.setMinHeight(dp(52));controls.addView(panic,new LinearLayout.LayoutParams(0,-2,1));Button mask=control("◈",()->cloak(true));mask.setTextSize(24);mask.setContentDescription("Switch to calculator");mask.setMinHeight(dp(52));LinearLayout.LayoutParams ml=new LinearLayout.LayoutParams(dp(64),-2);ml.setMargins(dp(10),0,0,0);controls.addView(mask,ml);frame.addView(controls);}
+        LinearLayout top=new LinearLayout(this);top.setGravity(Gravity.CENTER_VERTICAL);TextView brand=text(name.equals("calculator")?"Calculator":"Safe Bridge",20,true);top.addView(brand,new LinearLayout.LayoutParams(0,-2,1));top.addView(control("Close",()->finishAndRemoveTask()));top.setPadding(dp(18),dp(4),dp(18),dp(4));frame.addView(top);if(getResources().getConfiguration().screenHeightDp<500)top.setVisibility(name.equals("calculator")?View.VISIBLE:View.GONE);
+        if(!name.equals("calculator")){LinearLayout controls=new LinearLayout(this);controls.setPadding(dp(18),0,dp(18),dp(4));Button panic=control("Emergency • 911",()->emergency());panic.setTextColor(Color.WHITE);interactive(panic,box(Color.rgb(163,32,56)),Color.rgb(163,32,56),true);panic.setMinHeight(dp(52));controls.addView(panic,new LinearLayout.LayoutParams(0,-2,1));Button mask=control("◈",()->cloak(true));mask.setTextSize(24);mask.setContentDescription("Switch to calculator");mask.setMinHeight(dp(52));mask.setMinWidth(dp(64));LinearLayout.LayoutParams ml=new LinearLayout.LayoutParams(-2,-2);ml.setMargins(dp(10),0,0,0);controls.addView(mask,ml);frame.addView(controls);}
         frame.addView(deck,new LinearLayout.LayoutParams(-1,0,1));
         if(!name.equals("calculator")){
             LinearLayout dock=new LinearLayout(this);dock.setPadding(dp(16),dp(6),dp(16),dp(8));
-            String[] labels={"Home","Privacy","About"}, targets={"home","safety","about"};
-            for(int k=0;k<labels.length;k++){final String target=targets[k];Button nav=control(labels[k],()->show(target));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),0,dp(3),0);dock.addView(nav,lp);}frame.addView(dock);if(getResources().getConfiguration().screenHeightDp<500)dock.setVisibility(View.GONE);
+            String[] labels={"Home","Privacy","More"}, targets={"home","safety","about"};
+            for(int k=0;k<labels.length;k++){final String target=targets[k];Button nav=control(labels[k],()->show(target));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-2,1);lp.setMargins(dp(3),0,dp(3),0);dock.addView(nav,lp);}frame.addView(dock);
         }
-        if(name.equals("calculator")){calculatorPage();int index=frame.indexOfChild(deck);frame.removeView(deck);page.setPadding(dp(16),0,dp(16),dp(8));frame.addView(page,index,new LinearLayout.LayoutParams(-1,0,1));return;}
+        if(name.equals("calculator")){if(LocalLocationService.isActive()){LinearLayout updates=new LinearLayout(this);updates.addView(text("Location updates active",14,false),new LinearLayout.LayoutParams(0,-2,1));updates.addView(control("Stop updates",this::stopLocation));frame.addView(updates,frame.indexOfChild(deck));}calculatorPage();int index=frame.indexOfChild(deck);page.removeView(calculation);frame.addView(calculation,index,new LinearLayout.LayoutParams(-1,-2));deck.setSource(page);return;}
         
-        if(!name.equals("home") && getResources().getConfiguration().screenHeightDp<500)route("‹ Home","home");
         switch(name){
         case "home":
-            TextView greeting=text("A little support.\nA next step.",30,true);greeting.setPadding(dp(6),dp(4),0,dp(12));page.addView(greeting);
-            TextView intro=text("U.S. resource guide • Not a monitored service",13,false);page.addView(intro);
-            resource("♡","Find support","Connect with a trained advocate","help",0xFF9EE1EF);resource("◇","Concerned about a child","Understand official reporting options","child",0xFFA3EED9);resource("▧","Intimate-image support","Find tools and eligibility guidance","images",0xFFF5CBE6);resource("⊙","Device safety","Understand privacy and digital traces","safety",0xFFDCD8F5);
-            route("Before you begin · Privacy & disguise","intro");route("About & sources","about");break;
-        case "intro":
-            title("Before you begin");
-            note("U.S. RESOURCE PROTOTYPE • Not an emergency or monitored service. No one receives messages here. In immediate danger in the U.S., call 911 if safe to do so.");
-            note("The ◈ button instantly opens a colorful calculator and changes the launcher name/icon. Long-press = in the calculator to return. Android accessibility services can also perform a long-click. This is a visual disguise, not protection from discovery: Settings, app info, account/download records, monitoring and launcher caches can reveal Safe Bridge. Try the controls only when safe.");
-            note("Installed apps, browser history and call records can be discovered. Close does not erase traces or hide this app. Consider another device if yours may be monitored.");break;
+            title("Choose your next step");
+            TextView caution=text("Device activity may be monitored.",14,false);page.addView(caution);
+            choices("Need help now","urgent","Find Me","findme");
+            choices("Can’t speak","quiet","Can’t leave","staying");
+            choices("Warning signs","signs","Peer groups","peers");
+            choices("Safety tools","tools","More help","supportmenu");
+            TextView scope=text("U.S. guide • Independent services\nLinks and calls can leave traces.",13,false);page.addView(scope);
+            break;
+        case "urgent":
+            title("Choose what fits right now");
+            route("I cannot speak or I am hiding","quiet");route("I cannot leave right now","staying");route("I feel overwhelmed","distress");route("Find Me · location snapshot","findme");route("Reach a trained advocate","help");break;
+        case "quiet":
+            title("If speaking is not safe");
+            link("Open hotline text/chat options","https://humantraffickinghotline.org/en/get-help");route("Find Me · copy/share a snapshot","findme");button("Switch to calculator",()->cloak(true),false);
+            add("Text 233733 for the U.S. trafficking hotline. Chat can be unavailable. Texts, browser activity and notifications can be seen or heard; choose only an option that fits your situation. This app cannot silence your phone or contact anyone silently.");
+            add("If you are hiding, you do not have to reveal where you are in this app. Consider whether another device or a safe person's help is possible. In immediate danger in the U.S., use 911 if safe; this guide cannot dispatch help.");route("Options while unable to leave","staying");break;
+        case "staying":
+            title("You can seek support while staying");
+            route("Text/chat or advocate options","help");route("Consider a safe contact or signal","plan");route("Find Me · location snapshot","findme");
+            add("Leaving or confronting someone may increase danger. You do not need to leave, report, or decide everything now to ask for support. You know your situation best.");
+            add("If safe, consider a trusted contact, a signal and the response you want. Think about communication, medication and important numbers only if doing so will not increase risk. No plan details are collected here.");break;
+        case "distress":
+            title("One small choice is enough");
+            route("Reach a trained advocate","help");route("Connect with peers","peers");button("Switch to calculator",()->cloak(true),false);
+            add("You do not have to explain everything or decide now. If it feels comfortable, pause and notice something around you. Skip this if it makes you feel worse. A safe person or advocate may help you choose your next step.");
+            add("This app is not crisis care or a monitored service. If someone is in immediate danger in the U.S., use 911 if safe.");break;
+        case "supportmenu":
+            title("More support choices");
+            route("Trained advocate","help");route("Find local services","resources");route("Concerned family or friend","someone");route("Child exploitation reporting","child");route("Intimate-image tools","images");route("Learn prevention & warning signs","signs");break;
+        case "resources":
+            title("Find practical support");
+            link("Search official referral directory","https://humantraffickinghotline.org/en/service-provider-search");route("Ask an advocate for referrals","help");
+            add("The hotline directory can be searched by city, state or service. Ask about shelter, medical care, legal support or other needs that fit your situation. Listings are a selection; they do not guarantee openings, eligibility or a safe placement.");
+            add("Searching or contacting a provider can leave records. Safe Bridge does not send your location to this directory or arrange services.");break;
+        case "findme":
+            title("Find Me · snapshots");
+            button("Get a location fix",()->locationPermission(1),true);snapshotButton("Share snapshot · choose recipient",false);snapshotButton("Copy snapshot",true);
+            if(availableFix()==null)add("Get a fix to enable copy/share. Location access is optional; guidance works without it.");
+            add(locationMessage);
+            LocationFix fix=availableFix();if(fix!=null)note(fix.description(SystemClock.elapsedRealtimeNanos()));
+            button("Refresh location status",this::refreshLocation,false);button("Try last-known location · may be old",()->locationPermission(3),false);
+            if(LocalLocationService.isActive()){add(LocalLocationService.fixDescription());note("On-device updates active. No live recipient feed. Requested time remaining: "+Math.max(0,(LocalLocationService.endsAtElapsed()-SystemClock.elapsedRealtime())/60000)+" minutes. Fixes/cleanup can be delayed. Calculator and Close keep this session running.");button("Stop on-device updates",this::stopLocation,true);}
+            else{add(LocalLocationService.lastProblem());button("Keep updated on device · 15 minutes",()->confirmLocalSession(15),false);button("Keep updated on device · 60 minutes",()->confirmLocalSession(60),false);}
+            note("No live link is available in this build. A secure internet service and independent testing are still required. Sharing exports a snapshot only; recipients need no Safe Bridge installation to read text, but the selected app controls delivery and privacy.");
+            add("Location can be approximate, old, inaccurate or unavailable indoors/offline. Accuracy is an estimate, not a guaranteed boundary. Permissions, battery, Android Stop or device conditions can end updates. A visible notification and system location indicators may reveal use, including in calculator mode.");break;
         case "help":
-            title("You deserve support.");add("If someone is forcing or threatening you into work or sexual activity, a trained advocate can help you consider options. You do not have to decide everything now.");
-            note("Choose a way to reach help only if it feels safe. Do not assume leaving or confronting someone is the safest immediate step. An advocate can help with an individualized plan.");
-            add("National Human Trafficking Hotline\n1-888-373-7888 • U.S.");note(HOTLINE_POLICY);link("Read hotline confidentiality policy","https://humantraffickinghotline.org/en/confidentiality-policy");link("Open hotline phone dialer","tel:18883737888");link("Hotline help, chat & referrals","https://humantraffickinghotline.org/en/get-help");link("Read official safety planning guidance","https://humantraffickinghotline.org/en/safety-planning-information");add("The hotline’s own privacy and reporting policies apply. This app is independent and cannot guarantee confidentiality, response time or availability.");break;
+            title("Support at your pace");
+            link("Call trafficking hotline · U.S.","tel:18883737888");
+            link("Hotline chat, text & referrals","https://humantraffickinghotline.org/en/get-help");
+            route("Connect with peers","peers");
+            add("National Human Trafficking Hotline: 1-888-373-7888, advertised 24/7. Text 233733; see the official site for options. Chat may be unavailable; response time is not guaranteed.");
+            detail("Privacy before contacting",HOTLINE_POLICY);
+            add("You deserve support even if you are unsure what to call your experience. A trained advocate can discuss options; you do not have to decide everything now.");
+            link("Official confidentiality policy","https://humantraffickinghotline.org/en/confidentiality-policy");break;
+        case "signs":
+            title("Recognize pressure & control");
+            route("Work, relationships & recruitment","control");route("Online pressure & warning signs","online");route("Support someone safely","someone");
+            note("Warning signs are not proof or a diagnosis. Exploitation can involve a partner, family member, employer or stranger. Responsibility belongs to the person causing harm.");
+            link("Official trafficking warning signs","https://humantraffickinghotline.org/en/human-trafficking/recognizing-signs");break;
+        case "control":
+            title("Notice control, not stereotypes");
+            add("Threats, violence, withheld pay, controlled identity documents, isolation or constant monitoring can be warning signs. Someone may feel unable to leave work or sexual activity because of threats, debt or dependence.");
+            add("Recruitment may begin with trust, romance, a job or help with housing. Pressure to decide immediately, unclear pay or duties, and changing conditions deserve attention.");
+            add("You do not need proof to ask for support. For a job offer, if safe, ask about duties, pay, location and conditions and review the offer with someone you trust.");
+            route("Consider a safer next step","plan");route("Reach an advocate","help");
+            link("Read official warning signs","https://humantraffickinghotline.org/en/human-trafficking/recognizing-signs");break;
+        case "online":
+            title("Online pressure is a warning");
+            add("Someone may build trust in a game, social feed or messaging app, then push sexual conversations, images or an in-person meeting. Gifts, secrecy, threats or blackmail can be used to gain control, even by someone familiar.");
+            add("If someone threatens to share an image, it is not your fault. You can ask a safe adult or advocate for help. You do not need to investigate or confront the person.");
+            route("Intimate-image options","images");route("Child exploitation reporting","child");
+            link("NCMEC online-enticement guidance","https://www.missingkids.org/netsmartz/topics/online-enticement");break;
+        case "someone":
+            title("Listen. Offer choices.");
+            add("Listen calmly, believe their experience and avoid blame. Ask what feels safe and what support they want. Avoid pressuring someone to leave, confront a person or share details they do not want to share.");
+            add("If a child shares exploitation, let them know it is not their fault. A safe adult or trained advocate can help. Do not investigate, lure a suspect or search for abuse material.");
+            route("Find support options","help");route("Understand child reporting","child");
+            link("NCMEC guidance for safe conversations","https://www.missingkids.org/netsmartz/topics/online-enticement");break;
+        case "tools":
+            title("Useful choices, at your pace");
+            route("Find Me · location snapshot","findme");route("Think through a safety plan","plan");route("Find local services","resources");route("Device safety & traces","safety");route("Online pressure & prevention","online");route("Intimate-image tools","images");route("Disguise & exit controls","intro");break;
+        case "plan":
+            title("A plan that fits your situation");
+            add("You know your situation best. Leaving or confronting someone may increase danger. You can consider options with an advocate without committing to a decision.");
+            add("Who feels safe to contact? If useful and safe, agree on a signal and what response you want. Consider whether someone else could see your messages or overhear a call.");
+            add("If safe, think about access to medication, identification, important numbers and communication. Choose only steps that fit your circumstances. This app asks for and saves no planning details.");
+            route("Reach a trained advocate","help");
+            link("Official safety-planning guidance","https://humantraffickinghotline.org/en/safety-planning-information");break;
+        case "peers":
+            title("Connect with people who understand");
+            route("RAINN Youth HelpRoom · 14–24","rainn");route("After Silence forum · 18+","forum");route("1in6 groups · male-identifying 18+","oneinsix");route("Team HOPE · phone peer support","hope");
+            note(PEER_POLICY);link("NNEDV safer online-group guidance","https://www.techsafety.org/online-groups");break;
+        case "rainn":
+            title("RAINN Youth HelpRoom");add("The provider describes moderated text groups for survivors aged 14–24, with separate rooms for 14–17 and 18–24. Current session availability and schedule are unverified; check with RAINN. This is not emergency response.");
+            link("View HelpRoom rules & schedule","https://rainn.org/help-and-healing/hotline/youth-helproom/");
+            note("Moderators are mandatory reporters. Sharing identifying details may require a report to authorities. No online safety or confidentiality guarantee is possible.");route("Other peer options","peers");break;
+        case "forum":
+            title("After Silence forum");add("For survivors of sexual violence aged 18+. Moderated peer forums; public sections are visible without membership.");
+            link("View current registration guidance","https://www.aftersilence.org/forum/index.php?/topic/151788-attention-new-survivors-registering-at-after-silence/");
+            note("Joining requires birth date, a valid non-disposable email, email validation and moderator approval. Approval is not immediate. Communications are not private; this is not professional or emergency help.");
+            link("Read forum terms","https://www.aftersilence.org/forum/index.php?/topic/2390-terms-of-service/");break;
+        case "oneinsix":
+            title("1in6 online groups");add("For male-identifying survivors aged 18+ with unwanted sexual experiences. Free, facilitated text groups run on a schedule with limited places; sessions can be canceled.");
+            link("View 1in6 groups & schedule","https://1in6.org/support-group-chat");
+            note("Not crisis response or therapy. Eligibility cannot be fully verified, and participants may copy conversations. Chats are not fully anonymous or confidential. Third-party JotCast privacy terms apply.");
+            link("Read group terms (PDF)","https://1in6.org/1in6/documents/OSGs-terms-of-service.pdf");break;
+        case "hope":
+            title("NCMEC Team HOPE");add("Free phone peer support with trained volunteers for families of missing or exploited children and eligible adult survivors of childhood exploitation. This is matched support, not an online forum.");
+            link("Read Team HOPE eligibility & contact","https://www.missingkids.org/gethelpnow/support/teamhope");
+            note("Check eligibility with the service. No response time or availability is promised here. Calls can leave records. NCMEC privacy practices apply.");
+            link("Read NCMEC privacy policy","https://www.missingkids.org/footer/privacypolicy");break;
         case "child":
-            title("Concerned about a child?");add("NCMEC’s CyberTipline accepts reports of suspected child sexual exploitation. NCMEC analysts process reports and make them available to the appropriate law enforcement agency.");
-            note("You do not need to investigate or prove a crime yourself. Do not confront a suspected exploiter, lure them, or search for abuse material. Do not download or forward sexual images of children.");
-            add("On the official reporting site, describe what you directly know. Keep observations separate from guesses. This app does not collect names, reports, photos or evidence.");link("Open NCMEC CyberTipline","https://report.cybertip.org/");link("Read how CyberTipline works","https://www.missingkids.org/gethelpnow/cybertipline");add("If you are a child, you can ask a safe, trusted adult for help. You can also contact the CyberTipline yourself. If someone is in immediate danger in the U.S., call 911 if safe.");break;
+            title("Child exploitation reporting");
+            link("Open official CyberTipline","https://report.cybertip.org/");
+            detail("Before submitting a report",CYBERTIP_POLICY);
+            route("Image support for under-18 images","images");
+            add("Anyone can report suspected child sexual exploitation, including experiences from childhood if you are now an adult. You do not need to investigate or prove a crime. Describe what you know and separate observations from guesses.");
+            note("Do not download or forward sexual images of children, search for abuse material or confront a suspected exploiter. Safe Bridge collects no reports, identifying details or images.");
+            link("Read CyberTipline FAQ","https://report.cybertip.org/faqs");break;
         case "images":
-            title("It is not your fault.");add("If someone is threatening to share an intimate image, you can seek support. A safe, trusted adult or trained advocate may help you consider your next step.");
-            note("Taken before you were 18? NCMEC’s Take It Down may help limit sharing on participating public or unencrypted services. You can use it even if you are an adult now. It does not cover all websites or encrypted messaging, and removal is not guaranteed.");
-            add("Do not download, ask someone to send, or share an image to submit it. NCMEC’s FAQ says to use the device where the image was originally taken. If you no longer have access to that device, seek help through the CyberTipline instead. Safe Bridge never accepts images.");link("Open Take It Down","https://takeitdown.ncmec.org/");link("Read Take It Down eligibility & FAQ","https://takeitdown.ncmec.org/faq/");link("Report child exploitation to NCMEC","https://report.cybertip.org/");add("For images taken when you were 18 or older, Take It Down points to StopNCII. Read that service’s eligibility and privacy information before continuing.");link("Open StopNCII information","https://stopncii.org/");break;
+            title("Image threats are not your fault");
+            route("Taken before age 18 · Take It Down","takeitdown");route("Adult images · StopNCII","stopncii");route("Report child exploitation","child");
+            add("A safe adult or advocate can help you consider options. Safe Bridge never accepts images. These independent tools cannot guarantee removal everywhere.");break;
+        case "takeitdown":
+            title("NCMEC Take It Down");add("For qualifying intimate images of you taken before age 18, even if you are an adult now. Available beyond the U.S. Read eligibility before using it.");
+            link("Read Take It Down eligibility & FAQ","https://takeitdown.ncmec.org/faq/");link("Open Take It Down","https://takeitdown.ncmec.org/");
+            note("Do not download or ask someone to forward an image to submit it. Use the device where the image was originally taken. If you no longer have that device, NCMEC directs you to CyberTipline for assistance.");
+            add("Images stay on your device during hashing. Hashes are shared with participating services for matching on public or unencrypted areas. It does not cover all websites or encrypted messaging; removal is not guaranteed.");break;
+        case "stopncii":
+            title("StopNCII adult-image tool");add("For adult intimate images of yourself that you already have, review StopNCII eligibility. The tool is available worldwide; the official service decides eligibility.");
+            link("Read StopNCII eligibility & FAQ","https://stopncii.org/faq/");link("Open StopNCII information","https://stopncii.org/");
+            add("The image remains on your device while a hash is created. Participating platforms use hashes under their policies; this does not remove content from the whole internet or encrypted messages. Privacy terms apply, including technical records.");break;
         case "safety":
-            route("Calculator disguise & getting started","intro");title("Your device may leave traces.");add("Someone with access to this phone, accounts or network may see installed apps, activity, calls or browsing. Safe Bridge cannot detect monitoring or make a compromised device safe.");
-            note("If using this phone could put you at risk, consider a device and account the other person cannot access, and support from a trusted advocate. Changing settings or deleting history can be noticed. Choose what is safest in your situation.");
-            add("Safe Bridge itself has no accounts, analytics, location tracking, image uploads, notifications or saved notes. This does not describe the privacy practices of external websites, phone apps or the operating system. Guidance works offline. External websites and phone calls need their usual connectivity and may keep their own records.");add("Close removes this app’s task from recent apps, but does not uninstall it, clear browser/call history or erase device records. Uninstalling may still leave download history, backups or synced account records. Calculator mode changes the visible screen and launcher shortcut, but cannot make the app invisible. Settings/app info, installed-package records and launcher caches may still reveal Safe Bridge. Calculator mode stays selected after reopening; calculations are not saved.");link("Read NNEDV guidance on safer app use","https://www.techsafety.org/choosingapps");link("Read hotline digital safety warning","https://humantraffickinghotline.org/en/chat");break;
+            title("Your device may leave traces");
+            route("Calculator disguise & exit limits","intro");
+            add("Someone with access to this device, accounts or network may see installed apps, links, calls or browsing. Safe Bridge cannot detect monitoring or make a compromised device safe.");
+            note("Changing passwords, tracking settings or account access may alert an abusive person and increase danger. Consider planning changes with an advocate. If possible, seek help on a device and account they cannot access.");
+            detail("What Safe Bridge stores", "No accounts, analytics, uploads or saved planning notes. Find Me can hold the latest location in memory only when requested. Optional on-device updates use a visible notification; snapshots leave the app only when you choose Copy or Android sharing. Guidance works offline. This does not describe the privacy practices of external services or the operating system. Only navigation is restored during rotation; planning details and calculator entry are not saved.");
+            link("NNEDV technology safety planning","https://www.techsafety.org/resources-survivors/technology-safety-plan");
+            link("NNEDV safer app guidance","https://www.techsafety.org/choosingapps");break;
+        case "intro":
+            title("Disguise has limits");
+            add("The diamond button switches to a calculator and changes the launcher name/icon. Long-press equals to request a return to Safe Bridge. Accessibility services can perform a long-click. Back in the calculator closes the app.");
+            note("Calculator and Close do not stop an active on-device location session; use Stop updates or the notification Stop action. Its notification and system indicators stay visible. This is a visual disguise, not protection from discovery. Settings, app info, download/account records, monitoring and launcher caches can reveal Safe Bridge. Try controls only when safe.");
+            add("Close removes this task from Recents. It does not erase traces, uninstall the app or clear browser/call records. Uninstalling may still leave account or download records. Calculator mode stays selected after reopening; calculations are not saved.");break;
         default:
-            title("An early, independent preview.");add("Safe Bridge 0.5 • U.S.-focused\nA lightweight guide to existing services. Not affiliated with or endorsed by NCMEC or the National Human Trafficking Hotline.");note("Not for public deployment yet. Survivor, child-safety, accessibility, privacy and legal review are still needed. No live support, rescue service, AI advice, report submission or case tracking is provided.");add("Resource links checked November 14, 2026. Services and policies can change. Outside the U.S., seek appropriate local emergency and support services; this preview does not provide a verified international directory.");link("National Human Trafficking Hotline","https://humantraffickinghotline.org/en/get-help");link("NCMEC CyberTipline","https://www.missingkids.org/gethelpnow/cybertipline");link("NCMEC Take It Down","https://takeitdown.ncmec.org/");break;
+            title("Independent resource guide");
+            route("Disguise & exit controls","intro");route("Device privacy & traces","safety");
+            detail("Close this app", "Close removes the task from Recents but does not erase activity, browser/call records or installation records.");button("Close Safe Bridge",()->finishAndRemoveTask(),false);
+            add("Safe Bridge 0.6 private test • U.S.-focused. No one receives messages here. This app only links to independent services: no partnerships, hotline operation, live service integrations, case tracking or report submission. Optional Find Me provides on-device fixes and snapshot sharing; live recipient tracking is not available.");
+            note("Not for public deployment yet. Survivor, child-safety, privacy and accessibility review are still needed. Emergency 911 is U.S.-only. Outside the U.S., seek appropriate local services; no verified international emergency directory is included.");
+            add("Primary-source information checked November 16, 2026. Links, capacity and policies can change. Source details and limits are included in the accompanying source artifact.");
+            link("Hotline safety planning source","https://humantraffickinghotline.org/en/safety-planning-information");link("NCMEC online-safety source","https://www.missingkids.org/netsmartz/topics/online-enticement");break;
         }
-        deck.setSource(page);
+        deck.setSource(page);deck.restorePageIndex(pageIndex);if(restoredAnchor!=null){deck.restoreReadingAnchor(restoredAnchor);restoredAnchor=null;}
     }
-    @Override public void onBackPressed(){if(section.equals("calculator")){finishAndRemoveTask();return;}if(!section.equals("home"))show("home");else super.onBackPressed();}
+    @Override public void onBackPressed(){if(section.equals("calculator")){finishAndRemoveTask();return;}if(deck.previousPage())return;if(navigation.back(deck.getPageIndex())){render(navigation.route(),navigation.page());}else finishAndRemoveTask();}
 }

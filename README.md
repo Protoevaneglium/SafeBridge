@@ -1,66 +1,44 @@
-# Safe Bridge — 0.5 UI test branch
+# Safe Bridge 0.6 — private Android test
 
-This branch publishes experimental source for review, not a public-ready safety app. Package `com.stange.safebridge.pasteltest` updates the separately signed 0.4 test app, not the original 0.3 app. Main remains unchanged. No APK, signing keys or reference images are published with this update. Android runtime, S24 layout and accessibility testing remain unverified.
+An independent U.S.-focused resource guide for people facing trafficking, exploitation or related danger. This is a private review prototype, not an emergency service, hotline, reporting system or public-ready survivor tool. Source updates are intended for the existing experimental public test branch; no public APK/product release is authorized by this handoff.
 
-A U.S.-focused, independent safety/resource navigator. **Not an emergency service, hotline, reporting system or public-ready survivor tool.** Built at the owner's request as an initial APK for review.
+## Changes from 0.5
 
-## What works
-- Offline guidance: support, child exploitation reporting, intimate-image resources, device-safety caveats.
-- Confirmed external navigation to official sites, using the user's browser.
-- Dialer intents (never automatic calls), with confirmation.
-- Back/start navigation, paged native UI with disclosure pop-ups, Close removes task from Recents.
+- Compact home with eight native choices: Need help now, Find Me, Can’t speak, Can’t leave, Warning signs, Peer groups, Safety tools and More help. Direct paths cover hiding, distress, suspicious recruitment/grooming, concerned family/friends and prevention learning. Emergency/dialer and calculator remain outside guidance pages. The eight choices use four paired rows; constrained windows may require pagination.
+- Short offline information on coercion, recruitment, online enticement, image threats, supporting someone and considering a tailored next step. No checklists collect answers or planning details.
+- Action-first support/reporting pages with required disclosures before external navigation. Submitted CyberTipline reports cannot be canceled and every submitted report is made available to law enforcement.
+- Peer options with service eligibility and privacy limits: After Silence (18+ forum), 1in6 (male-identifying 18+ groups), RAINN Youth HelpRoom information (14–24; current session availability/schedule unverified), NCMEC Team HOPE (matched phone support, not a forum). No partnership or live integration is implied.
+- Find Me: optional location snapshots with coordinates, estimated accuracy, fix time/age, cache/approximate/mock labels, copy and Android sharing. Sharing UI is not proof of sending or receipt. No contact selection or sending is performed by Safe Bridge.
+- Optional 15/60-minute **on-device** location updating with an Android location foreground service, visible notification and Stop. It continues independently of Activity/cover, subject to Android/device restrictions; it does not transmit location. No live recipient link/backend exists. See [docs/FIND_ME.md](docs/FIND_ME.md) and the concrete [backend plan](docs/BACKEND_PLAN.md).
+- Preserved pastel gradients, translucent rounded panels and page/popup design; no app-owned scrolling widgets or text shrinking. Native external services have their own interfaces.
+- Back first moves to a previous guidance page, then the parent section. Rotation saves navigation coordinates and the first visible content anchor. Disclosure sheets close on recreation and never auto-open a website or dialer.
+- Adaptive page measurement, whole action labels, 48dp minimum controls, focus feedback and page announcements. The calculator display stays visible above a paged keypad if all rows do not fit. Extreme window/font combinations can show Expand window; universal accessibility/layout correctness is not claimed.
 
-## Privacy boundaries
-No app permissions, internet permission, accounts, analytics, notifications, geolocation, saved notes, uploads, AI or background service. Android/device records and external sites/phone records are outside the app's control. Close does not erase traces, hide installation or clear browser/call history. No guarantee of anonymity or safety on a monitored device.
+## Safety and privacy
 
-This prototype intentionally does not collect allegations, identifying details or child sexual abuse material. Never download or forward such material for this app. Do not use it for investigating or confronting anyone.
+Device activity may be monitored. Installed apps, browser/email/call records, network activity and operating-system records may reveal use. Changing passwords, tracking or account access can alert an abusive person and increase danger; consider changes with an advocate.
 
-## Sources checked 2026-11-14
-- https://humantraffickinghotline.org/en/get-help
-- https://humantraffickinghotline.org/en/safety-planning-information
-- https://humantraffickinghotline.org/en/chat
-- https://www.missingkids.org/gethelpnow/cybertipline
-- https://report.cybertip.org/
-- https://takeitdown.ncmec.org/ (links to StopNCII for adult images)
-- https://stopncii.org/
-- https://takeitdown.ncmec.org/faq/
-- https://www.techsafety.org/choosingapps
-- https://humantraffickinghotline.org/en/confidentiality-policy
-- https://www.missingkids.org/gethelpnow/exploitation-resources
+The calculator is visual camouflage only. It does not hide package/settings/download records, defeat monitoring or erase traces. Long-press equals to request returning to Safe Bridge; Back in calculator closes the task. Cover/Close do not stop an active on-device session; Stop updates and the notification Stop action do. Location indicators and the foreground notification may reveal use. Calculator mode persists through the launcher alias, while calculations are not saved.
 
-No affiliation/endorsement implied. Links and policies can change. U.S. 911 only, no international directory.
+Guidance requires no runtime permission. Optional Find Me requests coarse/fine location; session mode also requires enabled notifications. Manifest adds those permissions and the two location-foreground-service permissions. No INTERNET, background-location, contacts, SMS-sending, microphone, storage or exact-alarm permission is requested. Android location providers have their own processing/privacy.
 
-## Build
-Android SDK platform/build tools 35, JDK 17, zip. No Gradle dependency downloads.
+No accounts, analytics, backend, image uploads or saved planning notes. Coordinates/latest fix stay in process memory unless the user explicitly copies or shares a snapshot; destination apps, clipboard and recipients may retain it. Android may retain navigation coordinates across recreation; no location, personal planning details or calculator input is put in app-controlled saved state. Close removes the task from Recents and does not erase activity. External services/calls have their own privacy rules.
+
+## Build and verification
+
+Requires Android SDK platform/build tools 35, Java 17+ compiler, Python 3 and zip. No Gradle downloads.
 
 ```sh
 ANDROID_HOME=/path/to/sdk bash scripts/build.sh
 python3 scripts/checks.py
+java -m jdk.compiler/com.sun.tools.javac.Main -d build/host-tests app/src/main/java/com/stange/safebridge/Calculator.java app/src/main/java/com/stange/safebridge/NavigationState.java app/src/main/java/com/stange/safebridge/LocationFix.java tests/CalculatorTest.java tests/NavigationTest.java tests/LocationFixTest.java
+java -cp build/host-tests CalculatorTest
+java -cp build/host-tests NavigationTest
+java -cp build/host-tests com.stange.safebridge.LocationFixTest
 ```
 
-Produces `build/SafeBridge-unsigned.apk`. Sign with your own test/release key using Android `apksigner`. No signing keys are distributed or committed. Application ID `com.stange.safebridge.pasteltest`, min API 26, target API 35, version 0.5.0-ui-test.
+Build produces `build/SafeBridge-unsigned.apk`. Sign privately with your own key. Signing keys and passwords are excluded from the source artifact.
 
-## Validation and limitations
-Native compilation, static safety checks and APK signature verification completed for delivered preview. No emulator or S24 runtime verification completed. No real calls/reports sent. Do not treat compilation as a functional or safety certification.
+Package remains `com.stange.safebridge.pasteltest`, versionCode 6, versionName `0.6.0-private-test`, min API 26 / target API 35. The delivered signed APK uses the existing 0.4/0.5 pastel test certificate and is eligible to update that package. Installation/update behavior was not tested. The original 0.3 package remains separate.
 
-Before any public use: survivor-led review, child-safety and privacy/legal review, accessibility testing, monitored-device threat modeling, link maintenance, real Android device and interruption tests. Check external cancellation/return flows, large text, TalkBack, absent dialer/browser and offline behavior. Resource descriptions are informational, not a tailored safety plan.
-
-## Scope
-Public development is intended to be transparent. Do not submit personal stories, case details, private identifiers or abuse imagery in issues. No license granted yet; licensing requires the owner's decision. See SECURITY.md for reporting limitations.
-
-## 0.3 visual refresh (private test build)
-Original light cyan/blue gradient, softly translucent rounded panels, prominent resource cards and pill controls inspired by broad glass-UI principles. No Apple logos, reference artwork, screenshots, fonts or third-party icons are embedded. Native static gradients, not live blur, animation or background rendering loops.
-
-Emergency confirmation and dialer handoff, external navigation disclosures, calculator arithmetic, persistent launcher aliases and all privacy caveats are retained from 0.2. The camouflage is not authentication or guaranteed concealment. Long-press = to confirm return; Back closes calculator without opening help. Calculations remain memory-only.
-
-This is a UI revision, not a public safety certification. The reference image is not distributed with source or APK. Historical note: this was initially a private test; source is now published for review, not as a public APK release.
-
-See VERIFICATION.md for checks and remaining device tests.
-
-## 0.4 UI reference blend
-Original mint hero, cyan/mint/blush/lilac resource accents and generous rounded cards blend with the previous translucent glass surfaces. No reference artwork or mood tracking is included. Same offline links-only feature scope.
-
-This private UI test uses a distinct package and new test signer because the prior key password was unavailable. It installs alongside 0.3 and does not inherit its settings or replace it. Keep the existing app installed. No public release performed.
-
-### 0.5 UI test
-Pages and pop-ups replace the long scrolling interface. Back/Next navigation adapts guidance to available height; Home/Privacy/About remain available. Disclosure sheets keep Cancel and Calculator accessible and enable the external handoff only after the final disclosure page. This is a test build, not a public-deployment-ready safety product. See VERIFICATION.md for untested Android layout and accessibility cases.
+See [VERIFICATION.md](VERIFICATION.md) for exact passed checks and untested runtime cases, and [docs/SOURCES.md](docs/SOURCES.md) for primary-source evidence checked November 16, 2026. Previous-build notes are retained in `docs/PREVIOUS_0.5_NOTES.md`.
